@@ -48,5 +48,8 @@ Ultra-premium dark: deep lacquered brown ombre background, smoked-glass panels, 
 ## iPhone limits to remember (tell the owner honestly)
 No background sync (it syncs when the app is open and online), no vibration, sounds follow the silent switch, wiping Safari/Home Screen app storage before a sync loses unsynced changes (the "Save now" button in Settings forces a sync). Token in the private-repo link expires (owner chose ~1 year): the app shows an error in Settings when it does.
 
+## Ideas tried and dropped
+AI coach (2026-10-15): the owner only has Claude Pro (no API). A Claude-hosted page can call Claude on the Pro plan, but tested: it cannot fetch api.github.com (blocked), so it can't share data with this app without copy/paste. Owner chose to drop the coach idea entirely. Don't re-propose unless asked.
+
 ## Ideas not built yet
 Free on-device report scanning, photo background, more sounds/themes, accent colour picker, compact home view, training calendar, per-exercise rest, plate calculator.
