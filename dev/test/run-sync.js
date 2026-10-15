@@ -47,8 +47,11 @@ const typ = (w, sel, v) => { const el = w.document.querySelector(sel); el.value 
   ok(/Connected to/.test(w.document.body.textContent), 'shows connected');
   // later edit auto-saves
   clk(w, '[data-act="tab"][data-to="progress"]'); clk(w, '[data-act="ptab"][data-t="body"]'); clk(w, '[data-act="mfOpen"]');
-  typ(w, '#mf-date', '2026-10-20'); typ(w, '#mf-weight', '73.5'); clk(w, '[data-act="mfSave"]'); await sleep(3200);
+  typ(w, '#mf-date', '2026-10-20'); typ(w, '#mf-weight', '73.5'); clk(w, '[data-act="mfSave"]'); await sleep(20);
+  ok(!!S(w)('.tab[data-to="settings"] .sdot.wait'), 'save dot turns orange while a change waits');
+  await sleep(3200);
   ok(/73.5/.test(remote.file), 'later change saved automatically');
+  ok(!!S(w)('.tab[data-to="settings"] .sdot.ok'), 'save dot turns green once GitHub has it');
   // phone 2 / cleared Safari: empty local, connect -> data returns
   const w2 = boot(); await sleep(100);
   clk(w2, '[data-act="tab"][data-to="settings"]');

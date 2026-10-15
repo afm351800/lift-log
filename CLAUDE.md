@@ -21,7 +21,7 @@ Ultra-premium dark: deep lacquered brown ombre background, smoked-glass panels, 
 - `lib.js` — generated exercise library data. `images.js` — generated base64 exercise photos (`window.IMGDATA`). Don't hand-edit either.
 - `sw.js` — service worker (network first, falls back to cache, so the app works offline). Bump `CACHE` when you change the file list.
 - `manifest.webmanifest`, `icon-*.png` — install metadata.
-- `dev/test/*.js` — jsdom tests. Run: `cd dev && npm install && for t in run run-db run-scan run-local run-sync run-sound; do node test/$t.js | tail -2; done`. Run `node --check` on the extracted script too. All must pass before pushing.
+- `dev/test/*.js` — jsdom tests. Run: `cd dev && npm install && for t in run run-db run-scan run-local run-sync run-sound run-features; do node test/$t.js | tail -2; done`. Run `node --check` on the extracted script too. All must pass before pushing.
 
 ## Architecture (index.html)
 - State object `state`; string-template `render()`; click delegation via `data-act` → `A.<action>`; `softRender()` avoids wiping inputs; `go(name, params)` switches views (see the switch in `render()`).
@@ -31,6 +31,12 @@ Ultra-premium dark: deep lacquered brown ombre background, smoked-glass panels, 
 - Body tab: manual report entry form, tap any metric or body part to open its history page (`metricView`). Photo import via Claude exists only in the old Claude-hosted copy; not available here.
 - Sounds: `sfx(name)` Web Audio, soft notes (set, exercise, timer, finish); on/off in Settings (`settings.main.sound`).
 - Routines seeded for the owner: "1 Push", "2 Pull", "3 Mix". Coach feature was removed (it needed a paid API key).
+- Home "Up next" (`upNextId`): the routine after the last finished one, in home-screen order. No calendar.
+- Weight nudge (`nudgeFor`): if every set last time hit the top of the rep range, offer +2.5 kg with a one-tap button.
+- Live new best (`prCheck` in `A.mark`): beating every earlier finished session shows a top toast, `sfx('pr')`, and sets `set.pr` (optional field).
+- Finished workouts are editable from Progress › Workouts › Edit (stepper ctx `h`, changes only that set; can also delete the workout).
+- Routine page has Duplicate (`A.dupRoutine`), which opens the copy in the editor.
+- Settings tab dot (`syncDot`): green = on GitHub, orange = waiting/offline, red = GitHub refused (token). Only shown when sync is connected.
 
 ## Rules for changes
 1. **Data safety first.** If you change the shape of stored data (sessions, routines, settings, body log), write a migration that converts the OLD shape when loaded, and test it against old-shaped data, not only empty data. Never drop fields the user already has.
@@ -43,4 +49,4 @@ Ultra-premium dark: deep lacquered brown ombre background, smoked-glass panels, 
 No background sync (it syncs when the app is open and online), no vibration, sounds follow the silent switch, wiping Safari/Home Screen app storage before a sync loses unsynced changes (the "Save now" button in Settings forces a sync). Token in the private-repo link expires (owner chose ~1 year): the app shows an error in Settings when it does.
 
 ## Ideas not built yet
-"Not yet saved to GitHub" badge, free on-device report scanning, photo background, more sounds/themes.
+Free on-device report scanning, photo background, more sounds/themes, accent colour picker, compact home view, training calendar, per-exercise rest, plate calculator.

@@ -172,6 +172,27 @@ button.row{width:100%;text-align:left}
 .tab{flex:1;min-height:48px;border-radius:13px;font-weight:500;font-size:13px;letter-spacing:.01em;color:var(--muted);min-width:0}
 .tab.on{color:var(--text)}
 .tab.on .tl{border-bottom:2px solid var(--accent);padding-bottom:3px;box-shadow:0 7px 10px -7px var(--accent)}
+.tab .tl{position:relative}
+/* GitHub save state: small dot on the Settings tab */
+.sdot{position:absolute;top:-1px;right:-10px;width:7px;height:7px;border-radius:50%}
+.sdot.ok{background:var(--good);box-shadow:0 0 6px var(--good)}
+.sdot.wait{background:var(--accent-soft);box-shadow:0 0 6px var(--accent)}
+.sdot.err{background:var(--bad);box-shadow:0 0 6px var(--bad)}
+/* up next routine */
+.rcard.next{border-color:rgba(255,147,72,.5);box-shadow:inset 0 1px 0 rgba(255,240,222,.08),0 16px 28px -16px rgba(0,0,0,.9),0 0 30px -12px rgba(255,106,20,.6)}
+.upnext{color:var(--accent-soft)}
+/* weight nudge */
+.nudge{display:flex;align-items:center;gap:12px;background:rgba(255,106,20,.08);border:1px solid rgba(255,147,72,.42);border-radius:14px;padding:10px 10px 10px 14px;font-size:14px;line-height:1.35}
+.nudge .grow{flex:1;min-width:0}
+.btn.sm{min-height:42px;padding:0 14px;font-size:14px;border-radius:12px;white-space:nowrap;flex:none}
+/* new best during a workout */
+.set-s.newbest{color:var(--accent-soft)}
+/* editing a finished workout */
+.hset{padding-top:10px;margin-top:10px;border-top:1px solid var(--line)}
+.hset .set-top{margin-bottom:8px;align-items:center}
+.hst.done{color:var(--good);border-color:rgba(91,211,155,.45)}
+.hst.skipped{color:var(--bad);border-color:rgba(232,112,106,.45)}
+.hst.todo{color:var(--muted)}
 .dock{background:linear-gradient(180deg,rgba(34,18,10,.92),rgba(14,7,3,.98));border-top:1px solid rgba(255,236,214,.16);padding-top:8px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
 .dock-in{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
 .dock-btns{display:flex;gap:10px}
@@ -200,6 +221,7 @@ button.row{width:100%;text-align:left}
 .sheet p{margin:0;color:var(--muted)}
 .sheet-btns{display:flex;flex-direction:column;gap:10px;margin-top:4px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom,0px));z-index:60;background:linear-gradient(180deg,#f7efe6,#d8cbbb);color:#2a1405;padding:10px 18px;border-radius:14px;font-weight:500;max-width:calc(100% - 32px);box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.toast.top{top:calc(14px + env(safe-area-inset-top,0px));bottom:auto;background:linear-gradient(180deg,var(--accent-soft),var(--accent));color:var(--accent-ink);font-weight:600;white-space:nowrap;box-shadow:0 10px 30px rgba(0,0,0,.5),0 0 26px -6px rgba(255,106,20,.8)}
 
 /* summary */
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
@@ -706,7 +728,7 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
   async function syncPush() {
     if (!SYNC.cfg) return;
     if (SYNC.busy) { SYNC.again = true; return; }
-    SYNC.busy = true; state.syBusy = true; SYNC.err = '';
+    SYNC.busy = true; state.syBusy = true; SYNC.err = ''; SYNC.hard = false; paintDot();
     try {
       var txt = JSON.stringify(backupObj()), done = false;
       for (var i = 0; i < 2 && !done; i++) {
@@ -721,6 +743,7 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
       SYNC.dirty = false; SYNC.at = Date.now(); lsSet('liftlog.sync.sha', SYNC.sha); lsSet('liftlog.sync.dirty', '0'); lsSet('liftlog.sync.at', String(SYNC.at));
     } catch (e) {
       SYNC.err = (e && e.friendly) ? e.message : 'No connection. It will save to GitHub on the next change.';
+      SYNC.hard = !!(e && e.friendly);
       SYNC.dirty = true; lsSet('liftlog.sync.dirty', '1');
     }
     SYNC.busy = false; state.syBusy = false; softRender();
@@ -728,7 +751,7 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
   }
   function syncSoon() {
     if (!SYNC.cfg || Date.now() < SYNC.muteUntil) return;
-    SYNC.dirty = true; lsSet('liftlog.sync.dirty', '1');
+    SYNC.dirty = true; lsSet('liftlog.sync.dirty', '1'); paintDot();
     clearTimeout(SYNC.timer); SYNC.timer = setTimeout(syncPush, 2500);
   }
   function localEmpty() {
@@ -897,7 +920,19 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
     var t = function (to, label) {
       return '<button class="tab ' + (active === to ? 'on' : '') + '" data-act="tab" data-to="' + to + '"><span class="tl">' + label + '</span></button>';
     };
-    return '<nav class="tabbar" aria-label="Sections"><div class="tabbar-in">' + t('home', 'Routines') + t('library', 'Library') + t('progress', 'Progress') + t('settings', 'Settings') + '</div></nav>';
+    return '<nav class="tabbar" aria-label="Sections"><div class="tabbar-in">' + t('home', 'Routines') + t('library', 'Library') + t('progress', 'Progress') + t('settings', 'Settings' + syncDot()) + '</div></nav>';
+  }
+  // Green: GitHub has everything. Orange: a change is waiting to be saved (or no connection). Red: GitHub refused (token).
+  function syncDot() {
+    if (typeof SYNC === 'undefined' || !SYNC || !SYNC.cfg) return '';
+    var c = SYNC.err && SYNC.hard ? 'err' : ((SYNC.err || SYNC.dirty || SYNC.busy) ? 'wait' : 'ok');
+    var l = { ok: 'Saved to GitHub', wait: 'Not saved to GitHub yet', err: 'GitHub save problem, see Settings' }[c];
+    return '<span class="sdot ' + c + '" role="img" aria-label="' + l + '"></span>';
+  }
+  function paintDot() {
+    var t = document.querySelector('.tab[data-to="settings"] .tl'); if (!t) return;
+    var o = t.querySelector('.sdot'); if (o) o.parentNode.removeChild(o);
+    t.insertAdjacentHTML('beforeend', syncDot());
   }
   function bar(inner) { return '<div class="bar"><div class="bar-in">' + inner + '</div></div>'; }
   function liveHtml(s) {
@@ -929,11 +964,13 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
         '<div class="muted">Exercise ' + (act.idx + 1) + ' of ' + act.items.length + '</div>' +
         '<div class="ractions" style="margin-top:12px"><button class="btn btn-primary" data-act="resume">Resume</button><button class="btn btn-ghost" data-act="discardAsk">Discard</button></div></section>';
     }
+    var nx = upNextId(rs);
     rs.forEach(function (r) {
       var last = D('sessions').filter(function (s) { return s.routineId === r.id && s.finishedAt; })
         .sort(function (a, b) { return b.finishedAt - a.finishedAt; })[0];
-      h += '<article class="card rcard">' +
+      h += '<article class="card rcard' + (r.id === nx ? ' next' : '') + '">' +
         '<div class="rmain" role="button" tabindex="0" data-act="go" data-to="routine" data-id="' + esc(r.id) + '">' +
+        (r.id === nx ? '<div class="eyebrow upnext">Up next</div>' : '') +
         '<div class="rname display">' + esc(r.name) + '</div>' +
         '<div class="rmeta num">' + r.items.length + ' exercise' + (r.items.length === 1 ? '' : 's') + ' · about ' + estMin(r) + ' min' + (last ? ' · last done ' + fmtDate(last.finishedAt) : '') + '</div>' +
         '<div class="dots">' + uniqueMuscles(r).map(function (m) { return '<span class="pill"><span class="mdot" style="background:' + mcol(m) + '"></span>' + esc(m) + '</span>'; }).join('') + '</div>' +
@@ -949,6 +986,16 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
     return h + tabbar('home');
   }
 
+  // The routine after the one finished most recently, in the order shown on the home screen. No calendar, no missed days.
+  function upNextId(rs) {
+    var ok = rs.filter(function (r) { return r.items.length; });
+    if (ok.length < 2) return '';
+    var last = D('sessions').filter(function (s) { return s.finishedAt; }).sort(function (a, b) { return b.finishedAt - a.finishedAt; })[0];
+    if (!last) return ok[0].id;
+    var i = ok.findIndex(function (r) { return r.id === last.routineId; });
+    return ok[(i + 1) % ok.length].id;
+  }
+
   function routineView() {
     var r = byId('routines', state.view.id);
     if (!r) { return '<div class="empty">Routine not found.</div>'; }
@@ -962,7 +1009,7 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
     });
     if (!r.items.length) h += '<div class="empty">No exercises yet. Tap Customize to add some.</div>';
     h += '</div></div>';
-    h += '<div style="text-align:center;margin-top:10px"><button class="link" style="color:var(--bad)" data-act="delRoutineAsk" data-id="' + esc(r.id) + '">Delete routine</button></div>';
+    h += '<div style="display:flex;justify-content:center;gap:28px;margin-top:10px"><button class="link" data-act="dupRoutine" data-id="' + esc(r.id) + '">Duplicate</button><button class="link" style="color:var(--bad)" data-act="delRoutineAsk" data-id="' + esc(r.id) + '">Delete routine</button></div>';
     return h + bar('<button class="btn btn-start wide" data-act="start" data-id="' + esc(r.id) + '"' + (r.items.length ? '' : ' disabled') + '>Start</button>');
   }
 
@@ -1045,14 +1092,43 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
     if (it.mode === 'time' || !st.tMax) return '';
     return 'Target ' + rr({ reps: st.tMin, repsMax: st.tMax }) + ' reps';
   }
-  function hintFor(it) {
-    if (it.mode === 'time') return '';
+  // Weight nudge: every set last time was done at the top of the rep range -> suggest 2.5 kg more, applied with one tap.
+  function nudgeFor(it) {
+    if (it.mode === 'time') return null;
     var last = lastSessionItem(it.exId);
-    if (!last || last.mode === 'time') return '';
+    if (!last || last.mode === 'time' || !last.sets.length) return null;
     var top = it.sets[0] && it.sets[0].tMax;
-    if (!top || !last.sets.length) return '';
-    var allDone = last.sets.every(function (x) { return x.status === 'done' && (x.reps || 0) >= top; });
-    return allDone ? 'You reached ' + top + ' reps on every set last time. Try adding 2.5 kg today.' : '';
+    if (!top) return null;
+    var allTop = last.sets.every(function (x) { return x.status === 'done' && (x.reps || 0) >= top; });
+    if (!allTop) return null;
+    var kg = Math.max.apply(null, last.sets.map(function (x) { return x.kg || 0; }));
+    if (!(kg > 0)) return null;
+    var next = Math.round((kg + 2.5) * 100) / 100;
+    var todo = it.sets.filter(function (x) { return x.status === 'todo'; });
+    if (!todo.length || todo.every(function (x) { return (x.kg || 0) >= next; })) return null;
+    return { top: top, kg: next };
+  }
+  function nudgeHtml(it) {
+    var n = nudgeFor(it); if (!n) return '';
+    return '<div class="nudge" role="note"><div class="grow">You hit ' + n.top + ' reps on every set last time. Ready for <b class="num">' + kgText(n.kg) + ' kg</b>?</div>' +
+      '<button class="btn btn-start sm" data-act="applyNudge" data-kg="' + n.kg + '">Use ' + kgText(n.kg) + ' kg</button></div>';
+  }
+  // New best during the workout: beats every earlier finished session (and any best already set today).
+  function prCheck(s, it, st) {
+    var timed = it.mode === 'time';
+    var hs = history(it.exId, s.id).filter(function (p) { return p.timed === timed; });
+    if (!hs.length) return '';
+    var best = hs.reduce(function (a, b) { return (b.v > a.v || (b.v === a.v && (b.reps || 0) > (a.reps || 0))) ? b : a; });
+    var bv = best.v, br = best.reps || 0;
+    it.sets.forEach(function (y) {
+      if (y === st || !y.pr || y.status !== 'done') return;
+      var yv = timed ? (y.secs || 0) : (y.kg || 0), yr = y.reps || 0;
+      if (yv > bv || (yv === bv && yr > br)) { bv = yv; br = yr; }
+    });
+    var v = timed ? (st.secs || 0) : (st.kg || 0), r = st.reps || 0;
+    if (!(v > 0)) return '';
+    var beat = timed ? v > bv : (v > bv || (v === bv && r > br));
+    return beat ? (timed ? v + ' s' : kgText(v) + ' kg x ' + r) : '';
   }
 
   function exHeadHtml(it, extra) {
@@ -1068,8 +1144,7 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
     h += exHeadHtml(it);
     h += '<div class="stack">';
     h += '<button class="btn btn-ghost wide" data-act="exlist">Choose another exercise ▾</button>';
-    var hint = hintFor(it);
-    if (hint) h += '<div class="notice" style="margin:0;color:var(--good);border-color:var(--good)">' + esc(hint) + '</div>';
+    h += nudgeHtml(it);
     if (state.noteOpen) {
       h += '<textarea id="note-ta" class="field" placeholder="Your notes: seat height, grip, cues to remember" aria-label="Exercise notes">' + esc(ex && ex.note ? ex.note : '') + '</textarea>';
     } else if (ex && ex.note) {
@@ -1115,10 +1190,11 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
     var h = '<header class="top"><button class="link" data-act="toPre">‹ Overview</button><div class="eyebrow">Exercise ' + (s.idx + 1) + ' of ' + s.items.length + '</div><button class="link" data-act="quitAsk">Exit</button></header>';
     h += exHeadHtml(it, lastTxt ? '<div class="muted num">Last time: ' + esc(lastTxt) + '</div>' : '');
     h += '<div class="stack">';
+    h += nudgeHtml(it);
     it.sets.forEach(function (st, j) {
-      var label = st.status === 'done' ? 'Done' : st.status === 'skipped' ? 'Skipped' : '';
+      var label = st.status === 'done' ? (st.pr ? 'Done · New best' : 'Done') : st.status === 'skipped' ? 'Skipped' : '';
       var tt = targetText(st, it);
-      h += '<div class="card set st-' + st.status + '"><div class="set-top"><span class="set-n">Set ' + (j + 1) + ' of ' + it.sets.length + '</span><span class="set-s">' + label + '</span></div>' +
+      h += '<div class="card set st-' + st.status + '"><div class="set-top"><span class="set-n">Set ' + (j + 1) + ' of ' + it.sets.length + '</span><span class="set-s' + (st.pr && st.status === 'done' ? ' newbest' : '') + '">' + label + '</span></div>' +
         (tt ? '<div class="muted" style="font-size:13px;margin-top:-6px">' + esc(tt) + '</div>' : '') +
         '<div class="set-grid">' + setFields('w', s.idx, j, st, it.mode) + '</div>' +
         '<div class="set-btns"><button class="btn did ' + (st.status === 'done' ? 'on' : '') + '" data-act="mark" data-j="' + j + '" data-s="done">' + (st.status === 'done' ? '✓ Did it' : 'Did it') + '</button>' +
@@ -1490,8 +1566,27 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
   function sessionDetailView() {
     var s = byId('sessions', state.view.id);
     if (!s) return progressView();
-    var h = '<header class="top"><button class="link" data-act="back2progress">‹ Progress</button><span></span><span></span></header>';
+    var editing = state.sEdit === s.id;
+    var h = '<header class="top"><button class="link" data-act="back2progress">‹ Progress</button><span></span><button class="link" data-act="sEdit"' + (editing ? ' style="color:var(--accent-soft)"' : '') + '>' + (editing ? 'Done' : 'Edit') + '</button></header>';
     h += '<h1 class="display">' + esc(s.routineName) + '</h1><div class="muted num" style="margin:6px 0 14px">' + esc(fmtDateLong(s.finishedAt)) + ' · ' + fmtDur(workMs(s)) + ' · ' + fmtKg(volumeOf(s)) + ' kg lifted' + (s.kcal ? ' · ~' + s.kcal + ' kcal' : '') + '</div>';
+    if (editing) {
+      h += '<div class="notice">Fix any number or mark a set as done. Your bests and charts update straight away.</div><div class="stack">';
+      s.items.forEach(function (it, i) {
+        h += '<section class="card"><div class="nm" style="display:flex;align-items:center;gap:8px;font-weight:600"><span class="mdot" style="background:' + mcol(it.muscle) + '"></span>' + esc(it.name) + '</div>';
+        it.sets.forEach(function (x, j) {
+          var k = function (f) { return 'h:' + i + ':' + j + ':' + f; };
+          var lab = x.status === 'done' ? '✓ Done' : (x.status === 'skipped' ? 'Skipped' : 'Not done');
+          h += '<div class="hset"><div class="set-top"><span class="set-n" style="font-size:16px">Set ' + (j + 1) + '</span>' +
+            '<button class="chip sm hst ' + esc(x.status) + '" data-act="hStatus" data-i="' + i + '" data-j="' + j + '" aria-label="Set ' + (j + 1) + ': ' + lab + '. Tap to change">' + lab + '</button></div>' +
+            '<div class="set-grid">' + (it.mode === 'time'
+              ? stepper(k('kg'), x.kg || 0, 'kg', 'kg', true) + stepper(k('secs'), x.secs || 0, 'seconds', 's', true)
+              : stepper(k('kg'), x.kg || 0, 'kg', 'kg', true) + stepper(k('reps'), x.reps || 0, 'reps', 'r', true)) + '</div></div>';
+        });
+        h += '</section>';
+      });
+      h += '<button class="link" style="align-self:center;color:var(--bad)" data-act="delSessionAsk" data-id="' + esc(s.id) + '">Delete this workout</button></div>';
+      return h + bar('<button class="btn btn-primary wide" data-act="sEdit">Done</button>');
+    }
     h += '<div class="card"><div class="rows">' + s.items.map(function (it) {
       var parts = it.sets.map(function (x) {
         var t = it.mode === 'time' ? x.secs + ' s' : kgText(x.kg) + 'x' + x.reps;
@@ -1868,9 +1963,11 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
     }
     p.status = 'applied'; saveChat(); render();
   }
-  function toast(msg) {
-    state.toast = msg; softRender();
-    setTimeout(function () { state.toast = ''; softRender(); }, 2200);
+  var toastTimer = null;
+  function toast(msg, top) {
+    state.toast = msg; state.toastTop = !!top; softRender();
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { state.toast = ''; softRender(); }, top ? 2800 : 2200);
   }
 
   function sheetHtml() {
@@ -1883,6 +1980,9 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
     } else if (sh.type === 'delScan') {
       title = 'Remove this report?'; body = 'It is deleted from your body log and the charts.';
       btns = '<button class="btn btn-danger" data-act="delScan" data-ts="' + sh.ts + '">Remove report</button><button class="btn btn-ghost" data-act="closeSheet">Keep it</button>';
+    } else if (sh.type === 'delSession') {
+      title = 'Delete this workout?'; body = 'It is removed from your history, bests and charts. This cannot be undone.';
+      btns = '<button class="btn btn-danger" data-act="delSession" data-id="' + esc(sh.id) + '">Delete workout</button><button class="btn btn-ghost" data-act="closeSheet">Keep it</button>';
     } else if (sh.type === 'discard') {
       title = 'Discard this workout?'; body = 'Everything logged in this session will be lost.';
       btns = '<button class="btn btn-danger" data-act="discard">Discard workout</button><button class="btn btn-ghost" data-act="closeSheet">Keep it</button>';
@@ -1940,7 +2040,7 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
         default: html = homeView();
       }
     }
-    app.innerHTML = html + sheetHtml() + (state.toast ? '<div class="toast" role="status">' + esc(state.toast) + '</div>' : '');
+    app.innerHTML = html + sheetHtml() + (state.toast ? '<div class="toast' + (state.toastTop ? ' top' : '') + '" role="status">' + esc(state.toast) + '</div>' : '');
     if (ready() && state.view.name === 'workout' && activeSession()) startTicker(); else stopTicker();
   }
   function focusedInput() {
@@ -1969,7 +2069,8 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
     set: [[0, 659, 0.16, 0.09]],
     exercise: [[0, 523, 0.18, 0.1], [0.13, 784, 0.3, 0.1]],
     timer: [[0, 698, 0.2, 0.13], [0.24, 932, 0.34, 0.13]],
-    finish: [[0, 523, 0.2, 0.1], [0.14, 659, 0.2, 0.1], [0.28, 784, 0.2, 0.1], [0.42, 1047, 0.5, 0.1]]
+    finish: [[0, 523, 0.2, 0.1], [0.14, 659, 0.2, 0.1], [0.28, 784, 0.2, 0.1], [0.42, 1047, 0.5, 0.1]],
+    pr: [[0, 784, 0.16, 0.1], [0.11, 988, 0.18, 0.1], [0.22, 1319, 0.45, 0.11]]
   };
   function sfx(name) {
     if (!soundOn()) return;
@@ -2052,6 +2153,7 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
   }
   function getSet(ctx, i, j) {
     if (ctx === 'w') { var s = activeSession(); return s && s.items[i] && s.items[i].sets[j]; }
+    if (ctx === 'h') { var hs = byId('sessions', state.view.id); return hs && hs.items[i] && hs.items[i].sets[j]; }
     return state.draft && state.draft.items[i] && state.draft.items[i].sets[j];
   }
   function stepFor(f) { return f === 'kg' ? 2.5 : (f === 'secs' ? 5 : (f === 'rest' ? 15 : (f === 'weight' ? 0.5 : 1))); }
@@ -2075,6 +2177,8 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
     }
     var set = getSet(ctx, i, j); if (!set) return;
     var v = f === 'kg' ? Math.round(val * 100) / 100 : Math.round(val);
+    // A finished workout: change only this one set, nothing else follows.
+    if (ctx === 'h') { set[f] = v; put('sessions', byId('sessions', state.view.id)); return; }
     if ((f === 'reps' || f === 'repsMax') && ctx === 'e') v = Math.max(1, v);
     set[f] = v; set['ed_' + f] = true;
     if (ctx === 'e') normalise(set, f);
@@ -2198,11 +2302,13 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
     wDelSet: function () { var s = activeSession(), it = s.items[s.idx]; if (it.sets.length > 1) { it.sets.pop(); put('sessions', s); render(); } },
     mark: function (d) {
       var s = activeSession(), it = s.items[s.idx], st = it.sets[+d.j];
-      if (st.status === d.s) { st.status = 'todo'; }
+      if (st.status === d.s) { st.status = 'todo'; delete st.pr; }
       else {
-        st.status = d.s;
+        st.status = d.s; delete st.pr;
         if (d.s === 'done') {
-          sfx(it.sets.every(function (y) { return y.status !== 'todo'; }) ? 'exercise' : 'set');
+          var best = prCheck(s, it, st);
+          if (best) { st.pr = true; sfx('pr'); toast('New best · ' + best, true); }
+          else sfx(it.sets.every(function (y) { return y.status !== 'todo'; }) ? 'exercise' : 'set');
           var everything = s.items.every(function (x) { return x.sets.every(function (y) { return y.status !== 'todo'; }); });
           if (!everything) startRest(s);
         }
@@ -2233,7 +2339,28 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
     ptab: function (d) { state.ptab = d.t; render(); },
     loadR: function (d) { state.loadR = d.id; render(); },
     openEx: function (d) { go('exercise', { id: d.id }); },
-    openSession: function (d) { go('session', { id: d.id }); },
+    openSession: function (d) { state.sEdit = null; go('session', { id: d.id }); },
+    sEdit: function () { state.sEdit = state.sEdit === state.view.id ? null : state.view.id; render(); try { window.scrollTo(0, 0); } catch (e) { /* ignore */ } },
+    hStatus: function (d) {
+      var s = byId('sessions', state.view.id); if (!s) return;
+      var x = s.items[+d.i] && s.items[+d.i].sets[+d.j]; if (!x) return;
+      x.status = x.status === 'done' ? 'skipped' : (x.status === 'skipped' ? 'todo' : 'done');
+      delete x.pr; put('sessions', s); render();
+    },
+    delSessionAsk: function (d) { state.sheet = { type: 'delSession', id: d.id }; render(); },
+    delSession: function (d) { removeDoc('sessions', d.id); state.sEdit = null; state.ptab = 'workouts'; go('progress'); toast('Workout deleted'); },
+    applyNudge: function (d) {
+      var s = activeSession(); if (!s) return;
+      var kg = +d.kg, it = s.items[s.idx];
+      it.sets.forEach(function (x) { if (x.status === 'todo') x.kg = kg; });
+      put('sessions', s); render();
+    },
+    dupRoutine: function (d) {
+      var r = byId('routines', d.id); if (!r) return;
+      var order = D('routines').reduce(function (m, x) { return Math.max(m, x.order || 0); }, 0) + 1;
+      var n = { id: uid(), name: (r.name + ' copy').slice(0, 40), order: order, items: clone(r.items) };
+      put('routines', n); editRoutine(n.id); toast('Copy made. Rename it, then Save.');
+    },
     back2progress: function () { go('progress'); },
     libSide: function (d) { state.libSide = d.v; render(); },
     libMuscle: function (d) { state.libM = d.m; state.libEq = 'All'; go('libMuscle', { id: d.m }); },
