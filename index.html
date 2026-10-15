@@ -938,7 +938,7 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
         '<div class="rmeta num">' + r.items.length + ' exercise' + (r.items.length === 1 ? '' : 's') + ' · about ' + estMin(r) + ' min' + (last ? ' · last done ' + fmtDate(last.finishedAt) : '') + '</div>' +
         '<div class="dots">' + uniqueMuscles(r).map(function (m) { return '<span class="pill"><span class="mdot" style="background:' + mcol(m) + '"></span>' + esc(m) + '</span>'; }).join('') + '</div>' +
         '</div>' +
-        '<div class="ractions three"><button class="btn btn-start" data-act="start" data-id="' + esc(r.id) + '"' + (r.items.length ? '' : ' disabled') + '>Start workout</button>' +
+        '<div class="ractions three"><button class="btn btn-start" data-act="start" data-id="' + esc(r.id) + '"' + (r.items.length ? '' : ' disabled') + '>Start</button>' +
         '<button class="btn btn-ghost" data-act="editRoutine" data-id="' + esc(r.id) + '">Customize</button>' +
         '<button class="iconbtn" data-act="delRoutineAsk" data-id="' + esc(r.id) + '" aria-label="Delete ' + esc(r.name) + '">' + ICON_TRASH + '</button></div></article>';
     });
@@ -963,7 +963,7 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
     if (!r.items.length) h += '<div class="empty">No exercises yet. Tap Customize to add some.</div>';
     h += '</div></div>';
     h += '<div style="text-align:center;margin-top:10px"><button class="link" style="color:var(--bad)" data-act="delRoutineAsk" data-id="' + esc(r.id) + '">Delete routine</button></div>';
-    return h + bar('<button class="btn btn-start wide" data-act="start" data-id="' + esc(r.id) + '"' + (r.items.length ? '' : ' disabled') + '>Start workout</button>');
+    return h + bar('<button class="btn btn-start wide" data-act="start" data-id="' + esc(r.id) + '"' + (r.items.length ? '' : ' disabled') + '>Start</button>');
   }
 
   var PRESETS = [[4, 6], [6, 8], [8, 10], [10, 12], [12, 15]];
