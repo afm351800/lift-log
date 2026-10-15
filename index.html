@@ -71,6 +71,7 @@ h1.display,.rname,.bestnum{color:#fff}
 .btn:active{transform:translateY(1px)}
 .btn:disabled{opacity:.4}
 .btn-primary{background:var(--chrome);color:#2b1608;box-shadow:inset 0 1px 0 #fff,inset 0 -1px 0 rgba(0,0,0,.25),0 8px 20px -8px rgba(255,106,20,.7)}
+.btn-start{background:linear-gradient(180deg,var(--accent-soft),var(--accent));color:var(--accent-ink);font-weight:600;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),inset 0 -1px 0 rgba(0,0,0,.2),0 8px 22px -8px rgba(255,106,20,.75)}
 .btn-ghost{background:rgba(255,235,210,.05);border:1px solid rgba(240,222,200,.26);color:var(--text);box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
 .btn-danger{background:var(--bad);color:#2a0807}
 .btn.wide{width:100%}
@@ -937,7 +938,7 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
         '<div class="rmeta num">' + r.items.length + ' exercise' + (r.items.length === 1 ? '' : 's') + ' · about ' + estMin(r) + ' min' + (last ? ' · last done ' + fmtDate(last.finishedAt) : '') + '</div>' +
         '<div class="dots">' + uniqueMuscles(r).map(function (m) { return '<span class="pill"><span class="mdot" style="background:' + mcol(m) + '"></span>' + esc(m) + '</span>'; }).join('') + '</div>' +
         '</div>' +
-        '<div class="ractions three"><button class="btn btn-primary" data-act="start" data-id="' + esc(r.id) + '"' + (r.items.length ? '' : ' disabled') + '>Start workout</button>' +
+        '<div class="ractions three"><button class="btn btn-start" data-act="start" data-id="' + esc(r.id) + '"' + (r.items.length ? '' : ' disabled') + '>Start workout</button>' +
         '<button class="btn btn-ghost" data-act="editRoutine" data-id="' + esc(r.id) + '">Customize</button>' +
         '<button class="iconbtn" data-act="delRoutineAsk" data-id="' + esc(r.id) + '" aria-label="Delete ' + esc(r.name) + '">' + ICON_TRASH + '</button></div></article>';
     });
@@ -962,7 +963,7 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
     if (!r.items.length) h += '<div class="empty">No exercises yet. Tap Customize to add some.</div>';
     h += '</div></div>';
     h += '<div style="text-align:center;margin-top:10px"><button class="link" style="color:var(--bad)" data-act="delRoutineAsk" data-id="' + esc(r.id) + '">Delete routine</button></div>';
-    return h + bar('<button class="btn btn-primary wide" data-act="start" data-id="' + esc(r.id) + '"' + (r.items.length ? '' : ' disabled') + '>Start workout</button>');
+    return h + bar('<button class="btn btn-start wide" data-act="start" data-id="' + esc(r.id) + '"' + (r.items.length ? '' : ' disabled') + '>Start workout</button>');
   }
 
   var PRESETS = [[4, 6], [6, 8], [8, 10], [10, 12], [12, 15]];
