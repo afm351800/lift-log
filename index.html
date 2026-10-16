@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#120a06">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -36,6 +36,8 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
+/* No zoom anywhere: scrolling still works, pinch and double-tap zoom do not. */
+html,body,button,input,textarea,select,label,summary,a{touch-action:pan-x pan-y}
 html,body{height:100%}
 body{background:var(--bg);color:var(--text);font-family:var(--f-body);font-size:16px;line-height:1.4;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
 /* the wood: ombre planks, fine grain, a soft lacquer reflection */
@@ -349,7 +351,12 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
 
   var app = document.getElementById('app');
 
-  var MUSCLES = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs', 'Glutes', 'Core', 'Other'];
+  // iPhone ignores some zoom locks, so also stop its pinch gesture directly.
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (g) {
+    document.addEventListener(g, function (e) { e.preventDefault(); }, { passive: false });
+  });
+
+  var MUSCLES =['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs', 'Glutes', 'Core', 'Other'];
   var MCOL = {
     Chest: '#5aa9ff', Back: '#2fc7b8', Shoulders: '#8f8cff', Biceps: '#ff6fb1', Triceps: '#f2c94c',
     Legs: '#8bd450', Glutes: '#d98bff', Core: '#e8e2d0', Other: '#8d96a9'
