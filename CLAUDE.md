@@ -37,6 +37,8 @@ Ultra-premium dark: deep lacquered brown ombre background, smoked-glass panels, 
 - Finished workouts are editable from Progress › Workouts › Edit (stepper ctx `h`, changes only that set; can also delete the workout).
 - Routine page has Duplicate (`A.dupRoutine`), which opens the copy in the editor.
 - Motion (added 2026-10-16, owner wants it snappy, never laggy): `render()` puts page content in one `.page` wrapper (`wrapPage`); fixed bars, sheet and toast stay outside it. `go()` plays an iOS-style zoom in/out (`fxKind` uses `DEPTH`; the old page is kept as a `.ghost` copy, `playNav`). The four main tabs (`TAB_ORDER`) slide, and swiping left/right follows the finger (touch handlers near `sw`). Only transform and opacity are animated, blur is paused while moving, `endFx()` cancels instantly on the next tap, and nothing runs with reduced motion. If it ever feels slow on the phone, remove the motion rather than tune it.
+- Hold timer (2026-10-16): timed exercises (`mode:'time'`) show a slim timer per todo set in `activeView` (`holdHtml`, `holdTick`, actions `holdToggle`/`holdReset`). Started by hand, kept only in memory (`hold`), never linked to Did it. Blip at 10 s, 5-4-3-2-1, bell at 0 (`SFX.ten/tick/ring`).
+- Rename exercise (2026-10-16): pencil button on each exercise card in the routine editor opens the `rename` sheet (`renameAsk`/`renameGo`). It stores `ex.lib` first so the photo and form guide stay linked after the name changes.
 - Settings tab dot (`syncDot`): green = on GitHub, orange = waiting/offline, red = GitHub refused (token). Only shown when sync is connected.
 
 ## Rules for changes

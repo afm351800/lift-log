@@ -125,6 +125,22 @@ button.row{width:100%;text-align:left}
 .st-done .set-s{color:var(--good)}
 .st-skipped .set-s{color:var(--bad)}
 .set-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+/* Hold timer: sits inside a timed set, runs on its own and is never tied to Did it. */
+.hold{display:flex;align-items:center;gap:12px;padding:7px 10px 7px 7px;border-radius:16px;background:rgba(18,9,5,.45);border:1px solid var(--line)}
+.hold-go{width:42px;height:42px;border-radius:50%;flex:none;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,106,20,.14);border:1px solid rgba(255,147,72,.45);color:var(--accent-soft)}
+.hold.run .hold-go{background:var(--accent);border-color:transparent;color:var(--accent-ink)}
+.hold-mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px}
+.hold-cap{font-size:10px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);min-height:12px;white-space:nowrap}
+.hold-track{height:5px;border-radius:5px;background:rgba(255,235,210,.1);overflow:hidden}
+.hold-fill{height:100%;width:100%;border-radius:5px;transform-origin:left center;background:linear-gradient(90deg,var(--accent),var(--accent-soft));transition:transform .3s linear}
+.hold-time{display:inline-block;min-width:58px;text-align:right;font-family:var(--f-display);font-weight:300;font-size:26px;line-height:1}
+.hold.warn .hold-time,.hold.warn .hold-cap{color:var(--accent-soft)}
+.hold.count .hold-time{font-size:34px}
+.hold.done{border-color:rgba(47,196,190,.5)}
+.hold.done .hold-go{background:rgba(47,196,190,.12);border-color:rgba(47,196,190,.55);color:var(--pool)}
+.hold.done .hold-fill{background:var(--pool)}
+.hold.done .hold-cap,.hold.done .hold-time{color:var(--pool)}
+.hold-x{width:34px;height:34px;flex:none;border-radius:50%;color:var(--muted);font-size:17px;line-height:1}
 .did,.didnt{border:1px solid rgba(240,222,200,.24);color:var(--text);background:rgba(255,235,210,.04)}
 .did.on{background:var(--good);color:var(--good-ink);border-color:var(--good)}
 .didnt.on{background:var(--bad);color:#2a0807;border-color:var(--bad)}
@@ -915,7 +931,8 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
   var ICON_TRASH = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/></svg>';
   var ICON_IMG = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 9"/></svg>';
 
-  var ICON_GRIP = '<svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><circle cx="5" cy="5" r="1.9"/><circle cx="13" cy="5" r="1.9"/><circle cx="5" cy="13" r="1.9"/><circle cx="13" cy="13" r="1.9"/></svg>';
+  var ICON_PEN = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg>';
+  var ICON_GRIP ='<svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true"><circle cx="5" cy="5" r="1.9"/><circle cx="13" cy="5" r="1.9"/><circle cx="5" cy="13" r="1.9"/><circle cx="13" cy="13" r="1.9"/></svg>';
   var coach = { sample: null, limits: null, busy: false, ctl: null, draft: '', files: [], urls: [], init: false, chat: [] };
 
   function stepper(k, v, label, unit, small) {
@@ -1041,6 +1058,7 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
     d.items.forEach(function (it, i) {
       var ex = exOf(it.exId);
       h += '<section class="card cmp" data-card="' + i + '"><div class="ihead">' + thumbHtml(libOf(ex)) + '<div class="nm">' + esc(ex ? ex.name : 'Exercise') + '</div>' +
+        '<button class="tiny" data-act="renameAsk" data-i="' + i + '" aria-label="Rename exercise">' + ICON_PEN + '</button>' +
         '<button class="tiny" data-act="removeItem" data-i="' + i + '" aria-label="Remove exercise">✕</button>' +
         '<button class="grip" data-drag="' + i + '" aria-label="Hold and drag to reorder">' + ICON_GRIP + '</button></div>';
       h += '<div class="tools"><div class="seg"><button class="' + (it.mode !== 'time' ? 'on' : '') + '" data-act="setMode" data-i="' + i + '" data-m="reps">Reps</button><button class="' + (it.mode === 'time' ? 'on' : '') + '" data-act="setMode" data-i="' + i + '" data-m="time">Time</button></div>';
@@ -1215,7 +1233,8 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
       h += '<div class="card set st-' + st.status + '"><div class="set-top"><span class="set-n">Set ' + (j + 1) + ' of ' + it.sets.length + '</span><span class="set-s' + (st.pr && st.status === 'done' ? ' newbest' : '') + '">' + label + '</span></div>' +
         (tt ? '<div class="muted" style="font-size:13px;margin-top:-6px">' + esc(tt) + '</div>' : '') +
         '<div class="set-grid">' + setFields('w', s.idx, j, st, it.mode) + '</div>' +
-        '<div class="set-btns"><button class="btn did ' + (st.status === 'done' ? 'on' : '') + '" data-act="mark" data-j="' + j + '" data-s="done">' + (st.status === 'done' ? '✓ Did it' : 'Did it') + '</button>' +
+        (it.mode === 'time' ? holdHtml(s, j, st) : '') +
+        '<div class="set-btns"><button class="btn did' + (st.status === 'done' ? 'on' : '') + '" data-act="mark" data-j="' + j + '" data-s="done">' + (st.status === 'done' ? '✓ Did it' : 'Did it') + '</button>' +
         '<button class="btn didnt ' + (st.status === 'skipped' ? 'on' : '') + '" data-act="mark" data-j="' + j + '" data-s="skipped">Didn’t do it</button></div></div>';
     });
     h += '<section class="card"><div class="eyebrow" style="margin-bottom:6px">This workout</div><div class="rows">';
@@ -1241,6 +1260,67 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
   function restPct(s) {
     var tot = (s.restTotal || restSecs()) * 1000;
     return Math.max(0, Math.min(100, ((s.restEnd - Date.now()) / tot) * 100)).toFixed(1);
+  }
+
+  /* ---------- hold timer (timed exercises) ----------
+     Started by hand, never saved with the workout and never linked to Did it. It only counts, blips and rings. */
+  var hold = null; // { idx, j, total, endAt, leftMs, state: 'run' | 'pause' | 'done', last }
+  var IC_PLAY = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.6v12.8a1 1 0 0 0 1.5.86l10.4-6.4a1 1 0 0 0 0-1.72L9.5 4.74A1 1 0 0 0 8 5.6z"/></svg>';
+  var IC_PAUSE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.3"/><rect x="14" y="5" width="4" height="14" rx="1.3"/></svg>';
+  var IC_AGAIN = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.7-6"/><path d="M20 4v5h-5"/></svg>';
+  function holdRem() {
+    if (!hold) return 0;
+    if (hold.state === 'run') return Math.max(0, Math.ceil((hold.endAt - Date.now()) / 1000));
+    return hold.state === 'done' ? 0 : Math.ceil(hold.leftMs / 1000);
+  }
+  function holdLook(h, total) {
+    var st = h ? h.state : 'idle', rem = h ? holdRem() : total, p = 0;
+    if (h) {
+      var left = st === 'run' ? Math.max(0, h.endAt - Date.now()) : (st === 'done' ? 0 : h.leftMs);
+      p = Math.max(0, Math.min(1, 1 - left / (total * 1000)));
+    }
+    var run = st === 'run';
+    var cap = st === 'idle' ? 'Hold timer' : st === 'pause' ? 'Paused' : st === 'done' ? 'Done' : (rem > 10 ? 'Holding' : (rem > 5 ? '10 seconds to go' : ''));
+    var count = run && rem <= 5 && rem >= 1;
+    return {
+      cls: st + (run && rem <= 10 ? ' warn' : '') + (count ? ' count' : ''),
+      cap: cap, p: p.toFixed(4), pulse: count,
+      txt: count ? String(rem) : fmtClock(rem),
+      icon: run ? IC_PAUSE : (st === 'done' ? IC_AGAIN : IC_PLAY),
+      aria: run ? 'Pause timer' : (st === 'done' ? 'Run the timer again' : (st === 'pause' ? 'Resume timer' : 'Start timer'))
+    };
+  }
+  function holdHtml(s, j, st) {
+    var h = hold && hold.idx === s.idx && hold.j === j ? hold : null, total = h ? h.total : (st.secs || 0);
+    if (!(total > 0)) return '';
+    if (!h && st.status !== 'todo') return '';
+    var v = holdLook(h, total);
+    return '<div class="hold ' + v.cls + '" id="hold-' + j + '" role="timer">' +
+      '<button class="hold-go" data-act="holdToggle" data-j="' + j + '" aria-label="' + v.aria + '">' + v.icon + '</button>' +
+      '<div class="hold-mid"><div class="hold-cap" id="hold-cap-' + j + '">' + v.cap + '</div><div class="hold-track"><div class="hold-fill" id="hold-fill-' + j + '" style="transform:scaleX(' + v.p + ')"></div></div></div>' +
+      '<div class="hold-time num" id="hold-time-' + j + '">' + v.txt + '</div>' +
+      (h ? '<button class="hold-x" data-act="holdReset" aria-label="Reset timer">↺</button>' : '') + '</div>';
+  }
+  function holdTick(s) {
+    if (!hold) return;
+    if (hold.idx !== s.idx || s.stage !== 'active') { hold = null; return; }
+    if (hold.state !== 'run') return;
+    var rem = holdRem(), j = hold.j;
+    if (rem !== hold.last) {
+      hold.last = rem;
+      if (rem === 10) sfx('ten'); else if (rem >= 1 && rem <= 5) sfx('tick');
+      if (rem === 0) { hold.state = 'done'; sfx('ring'); render(); return; }
+    }
+    var el = document.getElementById('hold-' + j); if (!el) return;
+    var v = holdLook(hold, hold.total);
+    if (el.className !== 'hold ' + v.cls) el.className = 'hold ' + v.cls;
+    setText('hold-cap-' + j, v.cap);
+    var t = document.getElementById('hold-time-' + j);
+    if (t && t.textContent !== v.txt) {
+      t.textContent = v.txt;
+      if (v.pulse && MOTION) t.animate([{ transform: 'scale(1.25)' }, { transform: 'scale(1)' }], { duration: 380, easing: EASE });
+    }
+    var f = document.getElementById('hold-fill-' + j); if (f) f.style.transform = 'scaleX(' + v.p + ')';
   }
 
   function loadPoints(sessions) {
@@ -2018,6 +2098,10 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
         return '<button class="row" data-act="addToRoutine" data-rid="' + esc(r.id) + '" data-lib="' + esc(sh.lib) + '"><div class="grow"><div class="nm">' + esc(r.name) + '</div><div class="sub">' + r.items.length + ' exercise' + (r.items.length === 1 ? '' : 's') + '</div></div><span class="muted">+</span></button>';
       }).join('') + '<button class="row" data-act="newFromLib" data-lib="' + esc(sh.lib) + '"><div class="grow"><div class="nm" style="color:var(--accent-soft)">New routine with this exercise</div></div><span class="muted">›</span></button></div>';
       btns = '<button class="btn btn-ghost" data-act="closeSheet">Cancel</button>';
+    } else if (sh.type === 'rename') {
+      title = 'Rename exercise'; body = 'The new name shows everywhere. Your history for it stays.';
+      extra = '<input id="rn-in" class="field" value="' + esc(state.rnText) + '" maxlength="50" aria-label="Exercise name" autocapitalize="sentences" autocorrect="off" spellcheck="false">';
+      btns = '<button class="btn btn-primary" data-act="renameGo">Save name</button><button class="btn btn-ghost" data-act="closeSheet">Cancel</button>';
     } else if (sh.type === 'exlist') {
       var s = activeSession();
       title = 'Choose exercise'; body = 'Start any exercise, in any order.';
@@ -2074,6 +2158,7 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
   function go(name, params) {
     var kind = MOTION && ready() && !document.hidden ? fxKind(state.view.name, name) : '';
     endFx();
+    if (name !== 'workout') hold = null; // a hold timer never outlives the exercise screen
     var oldPage = kind ? app.querySelector('.page') : null, prevScroll = window.pageYOffset || 0;
     state.view = Object.assign({ name: name }, params || {});
     state.sheet = null;
@@ -2263,7 +2348,11 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
     exercise: [[0, 523, 0.18, 0.1], [0.13, 784, 0.3, 0.1]],
     timer: [[0, 698, 0.2, 0.13], [0.24, 932, 0.34, 0.13]],
     finish: [[0, 523, 0.2, 0.1], [0.14, 659, 0.2, 0.1], [0.28, 784, 0.2, 0.1], [0.42, 1047, 0.5, 0.1]],
-    pr: [[0, 784, 0.16, 0.1], [0.11, 988, 0.18, 0.1], [0.22, 1319, 0.45, 0.11]]
+    pr: [[0, 784, 0.16, 0.1], [0.11, 988, 0.18, 0.1], [0.22, 1319, 0.45, 0.11]],
+    // Hold timer: a soft blip for each of the last five seconds, a double blip at ten, a small bell at the end.
+    tick: [[0, 988, 0.07, 0.07]],
+    ten: [[0, 988, 0.06, 0.07], [0.13, 988, 0.06, 0.07]],
+    ring: [[0, 1047, 0.5, 0.11], [0, 2093, 0.3, 0.025], [0.3, 1319, 0.5, 0.11], [0.6, 1568, 0.9, 0.12], [0.6, 3136, 0.4, 0.02]]
   };
   function sfx(name) {
     if (!soundOn()) return;
@@ -2286,9 +2375,10 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
   function setText(id, v) { var el = document.getElementById(id); if (el && el.textContent !== String(v)) el.textContent = v; }
   function tick() {
     var s = activeSession();
-    if (!s || state.view.name !== 'workout') { stopTicker(); return; }
+    if (!s || state.view.name !== 'workout') { hold = null; stopTicker(); return; }
     var ms = workMs(s);
     setText('live-time', fmtHMS(ms)); setText('live-vol', fmtKg(volumeOf(s))); setText('live-kcal', Math.round(kcalFor(ms)));
+    holdTick(s);
     if (!s.restEnd) return;
     var rem = Math.max(0, Math.ceil((s.restEnd - Date.now()) / 1000));
     var t = document.getElementById('rest-time'); if (t) t.textContent = fmtClock(rem);
@@ -2403,6 +2493,34 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
 
   var A = {
     go: function (d) { go(d.to, { id: d.id }); },
+    holdToggle: function (d) {
+      var s = activeSession(); if (!s) return;
+      var j = +d.j, st = s.items[s.idx] && s.items[s.idx].sets[j]; if (!st) return;
+      ensureAudio();
+      var mine = hold && hold.idx === s.idx && hold.j === j;
+      if (mine && hold.state === 'run') { hold.leftMs = Math.max(0, hold.endAt - Date.now()); hold.state = 'pause'; }
+      else if (mine && hold.state === 'pause') { hold.endAt = Date.now() + hold.leftMs; hold.state = 'run'; hold.last = holdRem(); }
+      else {
+        var total = st.secs || 0; if (!(total > 0)) return;
+        hold = { idx: s.idx, j: j, total: total, endAt: Date.now() + total * 1000, leftMs: total * 1000, state: 'run', last: total };
+        sfx('set');
+      }
+      render();
+    },
+    holdReset: function () { hold = null; render(); },
+    renameAsk: function (d) {
+      var it = state.draft && state.draft.items[+d.i], ex = it && exOf(it.exId); if (!ex) return;
+      state.rnText = ex.name; state.sheet = { type: 'rename', id: ex.id }; render();
+      var el = document.getElementById('rn-in'); if (el) { try { el.focus(); el.select(); } catch (e) { /* optional */ } }
+    },
+    renameGo: function () {
+      var sh = state.sheet, ex = sh && sh.type === 'rename' && exOf(sh.id), nm = String(state.rnText || '').trim().slice(0, 50);
+      if (!ex || !nm) return;
+      // Keep the link to the exercise photo and form guide even if the old name was what matched it.
+      var l = libOf(ex); if (l && !ex.lib) ex.lib = l.id;
+      ex.name = nm; put('exercises', ex);
+      state.sheet = null; render(); toast('Renamed');
+    },
     tab: function (d) { go(d.to); },
     start: function (d) { startWorkout(d.id); },
     resume: function () {
@@ -2678,6 +2796,7 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
     if (t.dataset && t.dataset.act === 'draftName') state.draft.name = t.value;
     else if (t.id === 'pick-q') { state.picker.q = t.value; var l = document.getElementById('pick-list'); if (l) l.innerHTML = pickList(); }
     else if (t.id === 'custom-name') state.picker.customName = t.value;
+    else if (t.id === 'rn-in') state.rnText = t.value;
     else if (t.id === 'lib-q') { state.libQ = t.value; var lb = document.getElementById('lib-body'); if (lb) lb.innerHTML = libBody(); }
     else if (t.id === 'chat-in') coach.draft = t.value;
     else if (t.id === 'bk-in') state.bkText = t.value;
