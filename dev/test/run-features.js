@@ -62,7 +62,7 @@ const nextCard = () => { const c = $('.rcard.next'); return c ? c.querySelector(
   for (let j = 0; j < 3; j++) act('mark', { j, s: 'done' });
   ok(!$('.toast.top'), 'no new best on the very first session');
   finishAll();
-  act('go', { to: 'home' });
+  act('go', { to: 'today' }); act('tab', { to: 'home' });
   ok(nextCard() === 'Sample push copy', 'Up next moves to the routine after the one just done');
 
   // second workout: nudge to 42.5 kg
@@ -86,7 +86,7 @@ const nextCard = () => { const c = $('.rcard.next'); return c ? c.querySelector(
   finishAll();
 
   // edit a finished workout
-  act('go', { to: 'home' });
+  act('go', { to: 'today' }); act('tab', { to: 'home' });
   act('tab', { to: 'progress' });
   act('ptab', { t: 'workouts' });
   const rows = $$('[data-act="openSession"]');

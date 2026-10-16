@@ -20,7 +20,7 @@ function boot(store) {
   const click = (el) => { if (!el) throw new Error('missing'); el.dispatchEvent(new w.MouseEvent('click', { bubbles: true })); };
   await sleep(100);
   ok(!d.querySelector('[data-to="coach"]'), 'no Coach tab');
-  ok(/Routines/.test($('#app').textContent), 'home renders with local store');
+  ok(/Today/.test($('#app').textContent), 'home renders with local store');
   click($('[data-act="tab"][data-to="progress"]')); click($('[data-act="ptab"][data-t="body"]'));
   click($('[data-act="mfOpen"]'));
   const setv = (id, v) => { const el = $('#mf-' + id); el.value = v; el.dispatchEvent(new w.Event('input', { bubbles: true })); };

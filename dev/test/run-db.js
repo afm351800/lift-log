@@ -75,7 +75,7 @@ const ok = (c, m) => { if (!c) fail.push(m); else console.log('ok  ', m); };
   ok(/Workout complete/.test(d.getElementById('app').textContent), 'summary shown');
 
   // settings write
-  click(d.querySelector('[data-act="go"][data-to="home"]'));
+  click(d.querySelector('[data-act="go"][data-to="today"]'));
   click(d.querySelector('[data-act="tab"][data-to="settings"]'));
   click(d.querySelector('[data-act="step"][data-k="r:0:0:rest"][data-d="1"]'));
   await sleep(60);

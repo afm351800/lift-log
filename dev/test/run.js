@@ -31,7 +31,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
   await sleep(50);
-  ok(/Lift Log/.test($('#app').textContent), 'home renders title');
+  ok(/Today/.test($('#app').textContent), 'home renders title');
   ok(/Sample push/.test($('#app').textContent), 'sample routine shown (memory mode)');
   ok(/Preview mode/.test($('#app').textContent), 'preview banner shown');
 
@@ -108,7 +108,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(/Total load/.test($('#app').textContent) && /kcal/.test($('#app').textContent), 'summary shows total load and kcal');
 
   // progress
-  act('go', { to: 'home' });
+  act('go', { to: 'today' }); act('tab', { to: 'home' });
   act('tab', { to: 'progress' });
   ok(/Barbell Bench Press/.test($('#app').textContent), 'progress lists bench press');
   act('ptab', { t: 'workouts' });
