@@ -338,6 +338,17 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
 .bodymap .lead{stroke:rgba(222,226,232,.5);stroke-width:2.2;fill:none}
 .bodymap .ldot{fill:#ff9348}
 .bodymap .lab{fill:#eadccd;font:500 28px 'Helvetica Neue',Helvetica,Arial,sans-serif;letter-spacing:.14em;cursor:pointer}
+/* Motion. Only transform and opacity are animated, so it stays on the graphics chip and never blocks a tap. */
+#app{overflow-x:clip}
+.moving{will-change:transform,opacity}
+.moving .card,.ghost .card{-webkit-backdrop-filter:none;backdrop-filter:none}
+.ghost{position:fixed;left:0;right:0;z-index:15;max-width:560px;margin:0 auto;padding:16px max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px));pointer-events:none;-webkit-user-select:none;user-select:none;will-change:transform,opacity}
+.btn,.chip,.iconbtn,.tab,.row,.rmain{transition:transform .14s ease-out}
+.btn:active,.chip:active,.iconbtn:active{transform:scale(.97)}
+.row:active,.rmain:active{transform:scale(.985)}
+@keyframes sheetIn{from{transform:translateY(100%)}to{transform:none}}
+.sheet-enter .sheet{animation:sheetIn .26s cubic-bezier(.2,.8,.2,1)}
+@media (prefers-reduced-motion:reduce){.sheet-enter .sheet{animation:none}.btn,.chip,.iconbtn,.tab,.row,.rmain{transition:none}}
 </style>
 
 <div id="app"></div>
@@ -2048,6 +2059,11 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
       }
     }
     app.innerHTML = html + sheetHtml() + (state.toast ? '<div class="toast' + (state.toastTop ? ' top' : '') + '" role="status">' + esc(state.toast) + '</div>' : '');
+    wrapPage();
+    // The sheet slides up only when it first opens, not on every redraw while it stays open.
+    var sk = state.sheet ? state.sheet.type + ':' + (state.sheet.id || state.sheet.lib || '') : '';
+    app.classList.toggle('sheet-enter', !!sk && sk !== lastSheetKey);
+    lastSheetKey = sk;
     if (ready() && state.view.name === 'workout' && activeSession()) startTicker(); else stopTicker();
   }
   function focusedInput() {
@@ -2056,11 +2072,181 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
   }
   function softRender() { if (focusedInput()) { pendingRender = true; return; } render(); }
   function go(name, params) {
+    var kind = MOTION && ready() && !document.hidden ? fxKind(state.view.name, name) : '';
+    endFx();
+    var oldPage = kind ? app.querySelector('.page') : null, prevScroll = window.pageYOffset || 0;
     state.view = Object.assign({ name: name }, params || {});
     state.sheet = null;
     try { window.scrollTo(0, 0); } catch (e) { /* not available */ }
     render();
+    if (kind && oldPage) { try { playNav(kind, oldPage, prevScroll); } catch (e) { endFx(); } }
   }
+
+  /* ---------- motion ---------- */
+  var MOTION = !!(document.documentElement && document.documentElement.animate) &&
+    !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var TAB_ORDER = ['home', 'library', 'progress', 'settings'];
+  var DEPTH = { routine: 1, exercise: 1, session: 1, libMuscle: 1, metric: 1, coach: 1, libEx: 2, workout: 2, editor: 2, exInfo: 3, summary: 3, picker: 3 };
+  var FIXED_RE = /(^|\s)(bar|tabbar|dock|composer|scrim|sheet|toast)(\s|$)/;
+  var EASE = 'cubic-bezier(.2,.8,.2,1)';
+  var fx = null, lastTap = null, lastOrigin = null, lastSheetKey = '';
+
+  // The page content sits in one wrapper so it can move as a whole. Fixed bars, sheets and toasts stay outside it.
+  function wrapPage() {
+    var page = document.createElement('div'); page.className = 'page';
+    Array.prototype.slice.call(app.children).forEach(function (k) {
+      if (!FIXED_RE.test(typeof k.className === 'string' ? k.className : '')) page.appendChild(k);
+    });
+    app.insertBefore(page, app.firstChild);
+  }
+  function fxKind(from, to) {
+    var a = TAB_ORDER.indexOf(from), b = TAB_ORDER.indexOf(to);
+    if (a >= 0 && b >= 0) return a === b ? '' : (b > a ? 'slideL' : 'slideR');
+    var d = (DEPTH[to] || 0) - (DEPTH[from] || 0);
+    return d > 0 ? 'in' : (d < 0 ? 'out' : '');
+  }
+  function endFx() {
+    var f = fx; fx = null;
+    if (!f) return;
+    f.anims.forEach(function (a) { try { a.cancel(); } catch (e) { /* ignore */ } });
+    if (f.timer) clearTimeout(f.timer);
+    if (f.ghost && f.ghost.parentNode) f.ghost.parentNode.removeChild(f.ghost);
+    if (f.page) { f.page.classList.remove('moving'); f.page.style.transformOrigin = ''; }
+  }
+  // The page we are leaving is kept as a see-through copy on top, then removed when the move ends.
+  function ghostOf(oldPage, scrollY) {
+    var g = document.createElement('div');
+    g.className = 'ghost'; g.setAttribute('aria-hidden', 'true');
+    g.style.top = (-scrollY) + 'px';
+    g.appendChild(oldPage);
+    document.body.appendChild(g);
+    return g;
+  }
+  function playNav(kind, oldPage, prevScroll) {
+    var np = app.querySelector('.page'); if (!np || !oldPage) return;
+    var vw = window.innerWidth || 390, vh = window.innerHeight || 800;
+    var g = ghostOf(oldPage, prevScroll), gr = g.getBoundingClientRect(), nr = np.getBoundingClientRect();
+    var tap = lastTap && Date.now() - lastTap.t < 1500 ? lastTap : null, anims = [];
+    np.classList.add('moving');
+    if (kind === 'in') {
+      var ox = tap ? tap.x : vw / 2, oy = tap ? tap.y : vh / 2;
+      lastOrigin = { x: ox, y: oy };
+      np.style.transformOrigin = (ox - nr.left) + 'px ' + (oy - nr.top) + 'px';
+      g.style.transformOrigin = (ox - gr.left) + 'px ' + (oy - gr.top) + 'px';
+      anims.push(np.animate([{ transform: 'scale(.9)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 260, easing: EASE, fill: 'forwards' }));
+      anims.push(g.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(1.06)', opacity: 0 }], { duration: 200, easing: 'ease-out', fill: 'forwards' }));
+    } else if (kind === 'out') {
+      var o = lastOrigin || { x: vw / 2, y: vh * 0.4 };
+      np.style.transformOrigin = '50% 35%';
+      g.style.transformOrigin = (o.x - gr.left) + 'px ' + (o.y - gr.top) + 'px';
+      anims.push(np.animate([{ transform: 'scale(1.05)', opacity: 0.5 }, { transform: 'scale(1)', opacity: 1 }], { duration: 260, easing: EASE, fill: 'forwards' }));
+      anims.push(g.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(.9)', opacity: 0 }], { duration: 220, easing: 'ease-in', fill: 'forwards' }));
+    } else {
+      var dir = kind === 'slideL' ? 1 : -1;
+      anims.push(np.animate([{ transform: 'translate3d(' + (dir * vw) + 'px,0,0)' }, { transform: 'translate3d(0,0,0)' }], { duration: 240, easing: EASE, fill: 'forwards' }));
+      anims.push(g.animate([{ transform: 'translate3d(0,0,0)' }, { transform: 'translate3d(' + (-dir * vw) + 'px,0,0)' }], { duration: 240, easing: EASE, fill: 'forwards' }));
+    }
+    var f = fx = { anims: anims, ghost: g, page: np, timer: 0 };
+    var done = function () { if (fx === f) endFx(); };
+    f.timer = setTimeout(done, 340);
+    anims[0].onfinish = done;
+  }
+
+  // Swipe left or right on a main page (Routines, Library, Progress, Settings) to move to the next one.
+  var sw = null;
+  function hScroll(el) {
+    for (; el && el !== app && el.nodeType === 1; el = el.parentNode) {
+      if (el.scrollWidth > el.clientWidth + 2) {
+        var ox = window.getComputedStyle(el).overflowX;
+        if (ox === 'auto' || ox === 'scroll') return true;
+      }
+    }
+    return false;
+  }
+  function neighborGhost(name) {
+    var fn = { home: homeView, library: libView, progress: progressView, settings: settingsView }[name];
+    var g = document.createElement('div'); g.className = 'ghost'; g.setAttribute('aria-hidden', 'true'); g.style.top = '0px';
+    var page = document.createElement('div'); page.className = 'page'; page.innerHTML = fn();
+    Array.prototype.slice.call(page.children).forEach(function (k) {
+      if (FIXED_RE.test(typeof k.className === 'string' ? k.className : '')) page.removeChild(k);
+    });
+    g.appendChild(page);
+    g.style.transform = 'translate3d(' + (window.innerWidth * 3) + 'px,0,0)';
+    document.body.appendChild(g);
+    return g;
+  }
+  function swSide() { return sw.dx < 0 ? 1 : (sw.dx > 0 ? -1 : 0); }
+  function swEff(side) { var t = sw.idx + side; return side !== 0 && t >= 0 && t < TAB_ORDER.length ? sw.dx : sw.dx * 0.3; }
+  function swFrame() {
+    if (!sw || sw.busy) return;
+    sw.raf = 0;
+    var W = window.innerWidth || 390, side = swSide(), cur = app.querySelector('.page'); if (!cur) return;
+    var t = sw.idx + side, has = side !== 0 && t >= 0 && t < TAB_ORDER.length, eff = swEff(side);
+    cur.classList.add('moving');
+    cur.style.transform = 'translate3d(' + eff + 'px,0,0)';
+    [-1, 1].forEach(function (s) {
+      var gg = sw.g[s];
+      if (s === side && has) {
+        if (!gg) gg = sw.g[s] = neighborGhost(TAB_ORDER[t]);
+        gg.style.transform = 'translate3d(' + (eff + s * W) + 'px,0,0)';
+      } else if (gg) gg.style.transform = 'translate3d(' + (s * W * 3) + 'px,0,0)';
+    });
+  }
+  function swClean() {
+    [-1, 1].forEach(function (s) { var gg = sw && sw.g[s]; if (gg && gg.parentNode) gg.parentNode.removeChild(gg); });
+    var c = app.querySelector('.page'); if (c) { c.classList.remove('moving'); c.style.transform = ''; }
+  }
+  function swEnd(cancelled) {
+    var s = sw; if (!s || s.busy) return;
+    if (s.lock !== 1) { sw = null; return; }
+    s.busy = true;
+    var W = window.innerWidth || 390, side = swSide(), t = s.idx + side, has = side !== 0 && t >= 0 && t < TAB_ORDER.length;
+    var eff = swEff(side), vx = s.lt > s.pt ? (s.lx - s.px) / (s.lt - s.pt) : 0;
+    var commit = !cancelled && has && (Math.abs(s.dx) > W * 0.3 || (Math.abs(vx) > 0.3 && vx * s.dx > 0 && Math.abs(s.dx) > 24));
+    var cur = app.querySelector('.page'), gg = s.g[side], anims = [], toCur = commit ? -side * W : 0, dur = commit ? 220 : 200;
+    if (!cur) { swClean(); sw = null; return; }
+    cur.style.transform = '';
+    anims.push(cur.animate([{ transform: 'translate3d(' + eff + 'px,0,0)' }, { transform: 'translate3d(' + toCur + 'px,0,0)' }], { duration: dur, easing: EASE, fill: 'forwards' }));
+    if (gg) anims.push(gg.animate([{ transform: 'translate3d(' + (eff + side * W) + 'px,0,0)' }, { transform: 'translate3d(' + (toCur + side * W) + 'px,0,0)' }], { duration: dur, easing: EASE, fill: 'forwards' }));
+    var finished = false;
+    var done = function () {
+      if (finished) return; finished = true;
+      anims.forEach(function (a) { try { a.cancel(); } catch (e) { /* ignore */ } });
+      swClean();
+      sw = null;
+      if (commit) {
+        state.view = { name: TAB_ORDER[t] }; state.sheet = null;
+        try { window.scrollTo(0, 0); } catch (e) { /* not available */ }
+        render();
+      }
+    };
+    anims[0].onfinish = done;
+    setTimeout(done, dur + 120);
+  }
+  document.addEventListener('touchstart', function (e) {
+    if (sw || fx || !MOTION || e.touches.length !== 1 || !ready() || state.sheet) return;
+    var n = state.view.name, tg = e.target;
+    if (TAB_ORDER.indexOf(n) < 0 || !tg || !app.contains(tg) || focusedInput() || hScroll(tg)) return;
+    if (tg.closest && tg.closest('input,textarea,select')) return;
+    var p = e.touches[0], now = Date.now();
+    sw = { x: p.clientX, y: p.clientY, lock: 0, dx: 0, idx: TAB_ORDER.indexOf(n), g: {}, raf: 0, busy: false, lx: p.clientX, px: p.clientX, lt: now, pt: now - 1 };
+  }, { passive: true });
+  document.addEventListener('touchmove', function (e) {
+    if (!sw || sw.busy) return;
+    var p = e.touches[0], dx = p.clientX - sw.x, dy = p.clientY - sw.y;
+    if (!sw.lock) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      sw.lock = Math.abs(dx) > Math.abs(dy) * 1.4 ? 1 : -1;
+    }
+    if (sw.lock !== 1) return;
+    if (e.cancelable) e.preventDefault();
+    var now = Date.now();
+    sw.px = sw.lx; sw.pt = sw.lt; sw.lx = p.clientX; sw.lt = now;
+    sw.dx = dx;
+    if (!sw.raf) sw.raf = raf(swFrame) || 1;
+  }, { passive: false });
+  document.addEventListener('touchend', function () { swEnd(false); });
+  document.addEventListener('touchcancel', function () { swEnd(true); });
 
   /* ---------- timer, sound, wake lock ---------- */
   var ticker = null, beeped = false, actx = null, wake = null;
@@ -2460,6 +2646,8 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
     if (!t || !app.contains(t) || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return;
     if (t.disabled) return;
     var fn = A[t.dataset.act];
+    // Remember where the finger landed so a page can open from that spot.
+    lastTap = e.clientX || e.clientY ? { x: e.clientX, y: e.clientY, t: Date.now() } : null;
     if (fn) fn(t.dataset, t, e);
   });
   app.addEventListener('keydown', function (e) {

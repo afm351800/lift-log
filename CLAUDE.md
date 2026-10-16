@@ -36,6 +36,7 @@ Ultra-premium dark: deep lacquered brown ombre background, smoked-glass panels, 
 - Live new best (`prCheck` in `A.mark`): beating every earlier finished session shows a top toast, `sfx('pr')`, and sets `set.pr` (optional field).
 - Finished workouts are editable from Progress › Workouts › Edit (stepper ctx `h`, changes only that set; can also delete the workout).
 - Routine page has Duplicate (`A.dupRoutine`), which opens the copy in the editor.
+- Motion (added 2026-10-16, owner wants it snappy, never laggy): `render()` puts page content in one `.page` wrapper (`wrapPage`); fixed bars, sheet and toast stay outside it. `go()` plays an iOS-style zoom in/out (`fxKind` uses `DEPTH`; the old page is kept as a `.ghost` copy, `playNav`). The four main tabs (`TAB_ORDER`) slide, and swiping left/right follows the finger (touch handlers near `sw`). Only transform and opacity are animated, blur is paused while moving, `endFx()` cancels instantly on the next tap, and nothing runs with reduced motion. If it ever feels slow on the phone, remove the motion rather than tune it.
 - Settings tab dot (`syncDot`): green = on GitHub, orange = waiting/offline, red = GitHub refused (token). Only shown when sync is connected.
 
 ## Rules for changes
