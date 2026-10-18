@@ -417,6 +417,21 @@ input.trange{-webkit-appearance:none;appearance:none;width:100%;height:28px;back
 input.trange::-webkit-slider-runnable-track{height:4px;border-radius:4px;background:rgba(255,235,210,.14)}
 input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;margin-top:-10px;background:var(--chrome);box-shadow:0 2px 8px rgba(0,0,0,.6),0 0 12px -2px rgba(255,106,20,.6)}
 .selinfo{margin-top:10px;font-size:15px;min-height:21px}
+.covctl{display:flex;gap:6px;margin-top:12px}
+.covctl button{flex:1;min-height:36px;border-radius:999px;border:1px solid var(--line);background:rgba(255,235,210,.05);font-weight:500;font-size:14px;color:var(--muted)}
+.covctl button.on{background:var(--chrome);color:#2b1608;border-color:transparent}
+.covrow{display:flex;align-items:center;gap:12px;padding:8px 6px;margin:0 -6px;border-radius:10px;cursor:pointer}
+.covrow.sel{background:rgba(255,235,210,.07)}
+.covrow .nm{width:92px;flex:none;font-weight:500}
+.covrow .trk{position:relative;flex:1;height:8px;border-radius:6px;background:rgba(255,235,210,.08)}
+.covrow .trk i{position:absolute;left:0;top:0;bottom:0;border-radius:6px}
+.covrow .trk b{position:absolute;left:50%;top:-4px;bottom:-4px;border-left:1.5px dashed rgba(255,235,210,.5)}
+.covrow .v{width:40px;flex:none;text-align:right;font-size:14px}
+.covrow.low .v{color:#ffb27a}
+.covsub{margin:12px 0 2px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.covsum{margin-top:10px;font-size:14px;color:var(--muted)}.covsum b{color:var(--text);font-weight:500}
+.covlegend{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.covlegend .g{flex:1;height:6px;border-radius:6px;background:linear-gradient(90deg,#58504c,#ff9348 50%,#3cc4b4)}
 .recrow{display:flex;align-items:center;gap:12px;padding:9px 0}
 .recrow .nm{width:92px;flex:none;font-weight:500}
 .recrow .hbar{flex:1;height:6px;border-radius:6px;background:rgba(255,235,210,.08);overflow:hidden}
@@ -478,7 +493,7 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
     data: { exercises: [], routines: [], sessions: [], settings: [] },
     loaded: { exercises: false, routines: false, sessions: false, settings: false },
     view: { name: 'today' },
-    lg: null, recT: 0, recSel: '', shareUrl: '',
+    lg: null, recT: 0, recSel: '', recMode: 'cov', recW: 1, recE: 0, shareUrl: '',
     draft: null,
     picker: { q: '', muscle: 'All', custom: false, customName: '', customMuscle: 'Chest' },
     sheet: null,
@@ -2414,7 +2429,7 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
   function heatWord(h) { return h < FRESH ? 'Fresh' : h < 0.5 ? 'Recovering' : 'Just worked'; }
   // Figure: the same outline as the library map, drawn 10% narrower (a swimmer's build) with the face, hair and hand details left plain.
   var FIG = { front: { vb: '40 150 650 1215', cx: 364 }, back: { vb: '760 150 650 1215', cx: 1084 } };
-  function heatSvg(side, H, plainColour) {
+  function heatSvg(side, H, plainColour, fillFn) {
     var f = FIG[side], groups = {}, order = [], plain = '';
     BODY[side].forEach(function (p) {
       var m = regOf(BM_SLUG[side][p.s] || '');
@@ -2424,11 +2439,11 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
     var s = '<svg class="hmap" viewBox="' + f.vb + '" role="group" aria-label="' + (side === 'front' ? 'Front' : 'Back') + ' of the body"><g transform="translate(' + f.cx + ' 0) scale(.9 1) translate(' + (-f.cx) + ' 0)">' +
       '<path class="hout" d="' + BODY.border[side] + '"/><g class="hpas">' + plain + '</g>';
     order.forEach(function (m) {
-      s += '<g class="hreg' + (state.recSel === m ? ' sel' : '') + '" data-act="recMuscle" data-m="' + m + '" style="fill:' + (plainColour || heatFill(H[m])) + '" role="button" aria-label="' + REG_LABEL[m] + '">' + groups[m].map(function (d) { return '<path d="' + d + '"/>'; }).join('') + '</g>';
+      s += '<g class="hreg' + (state.recSel === m ? ' sel' : '') + '" data-act="recMuscle" data-m="' + m + '" style="fill:' + (plainColour || (fillFn ? fillFn(m) : heatFill(H[m]))) + '" role="button" aria-label="' + REG_LABEL[m] + '">' + groups[m].map(function (d) { return '<path d="' + d + '"/>'; }).join('') + '</g>';
     });
     return s + '</g></svg>';
   }
-  function heatMapsHtml(H) { return '<div class="hmaps" id="hmaps">' + heatSvg('front', H) + heatSvg('back', H) + '</div>'; }
+  function heatMapsHtml(H, fillFn) { return '<div class="hmaps" id="hmaps">' + heatSvg('front', H, '', fillFn) + heatSvg('back', H, '', fillFn) + '</div>'; }
 
   /* ---------- planning: what to do next, from what is fresh ---------- */
   function dayStart(ts, add) { var d = new Date(ts); d.setHours(0, 0, 0, 0); if (add) d.setDate(d.getDate() + add); return d.getTime(); }
@@ -2602,9 +2617,93 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
     var v = H[m] || 0;
     return '<b>' + REG_LABEL[m] + '</b> <span class="muted">· ' + heatWord(v) + (v >= FRESH ? ' · fresh in ~' + freshIn(ev, m, T) + ' h' : '') + '</span>';
   }
+  /* ---------- coverage: hard sets per muscle per week (lifting only, cardio is not counted) ----------
+     Same weights as the living map (main muscle 1, helpers about 0.5 per done set). Averaged over 1 to 4 weeks ending on the chosen day.
+     Goal: about 10 sets a week for the big muscles, 5 for the small ones. A new user is averaged over the days they actually have. */
+  var COV_SMALL = ['traps', 'forearms', 'adductors', 'lower back', 'neck'];
+  var COV_ORDER = ['chest', 'shoulders', 'lats', 'biceps', 'triceps', 'abdominals', 'quadriceps', 'hamstrings', 'glutes', 'calves', 'traps', 'lower back', 'forearms', 'adductors'];
+  function covGoal(r) { return COV_SMALL.indexOf(r) >= 0 ? 5 : 10; }
+  function covLow(wk, r) { return wk < covGoal(r) * 0.9; }
+  function covNum(n) { return String(Math.round(n * 10) / 10); }
+  function covFill(wk, r) {
+    var t = Math.min(1, wk / (covGoal(r) * 0.9));
+    if (t < 0.03) return 'rgb(88,80,76)';
+    return t < 0.5 ? mixRgb([88, 80, 76], [255, 147, 72], t / 0.5) : mixRgb([255, 147, 72], [60, 196, 180], (t - 0.5) / 0.5);
+  }
+  function coverage() {
+    var DAY = 86400000, end = state.recE ? dayStart(Date.now(), state.recE + 1) : Date.now(), W = state.recW || 1, start = end - W * 7 * DAY;
+    var fin = D('sessions').filter(function (s) { return s.finishedAt; });
+    var first = fin.reduce(function (m, s) { return Math.min(m, s.finishedAt); }, Infinity);
+    var eff = first === Infinity ? start : Math.max(start, dayStart(first));
+    var weeks = Math.min(W, Math.max(1, (end - eff) / (7 * DAY))), regs = {}, any = false;
+    REGS.forEach(function (r) { regs[r] = { tot: 0, reps: 0, rs: 0 }; });
+    fin.forEach(function (s) {
+      if (s.finishedAt <= start || s.finishedAt > end) return;
+      s.items.forEach(function (it) {
+        var done = it.sets.filter(function (x) { return x.status === 'done'; }), n = done.length; if (!n) return;
+        var timed = it.mode === 'time', rp = 0; if (!timed) done.forEach(function (x) { rp += x.reps || 0; });
+        var w = exWeights(it.exId); any = true;
+        Object.keys(w).forEach(function (r) { var a = regs[r]; if (!a) return; a.tot += w[r] * n; if (!timed) { a.reps += w[r] * rp; a.rs += w[r] * n; } });
+      });
+    });
+    REGS.forEach(function (r) { var a = regs[r]; a.wk = a.tot / weeks; a.reps = Math.round(a.reps); a.avg = a.rs ? a.reps / a.rs : 0; });
+    return { regs: regs, weeks: weeks, W: W, end: end, any: any, short: weeks < W - 0.01, days: Math.max(1, Math.ceil((end - eff) / DAY)) };
+  }
+  function trainedBy(r) {
+    return D('routines').filter(function (rt) { return rt.items.some(function (it) { return (exWeights(it.exId)[r] || 0) >= 0.5; }); })
+      .sort(function (a, b) { return (a.order || 0) - (b.order || 0); }).map(function (rt) { return rt.name; });
+  }
+  function covLabel(C) { return state.recE ? new Date(C.end - 1).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : 'Today'; }
+  function covRowsHtml(C) {
+    var h = '', sm = false;
+    COV_ORDER.forEach(function (r) {
+      if (!sm && COV_SMALL.indexOf(r) >= 0) { sm = true; h += '<div class="covsub">Smaller muscles</div>'; }
+      var x = C.regs[r], w = Math.min(100, x.wk / (covGoal(r) * 2) * 100);
+      h += '<div class="covrow' + (state.recSel === r ? ' sel' : '') + (covLow(x.wk, r) ? ' low' : '') + '" data-act="recMuscle" data-m="' + r + '" role="button" tabindex="0"><span class="nm">' + REG_LABEL[r] + '</span><span class="trk"><i style="width:' + w + '%;background:' + covFill(x.wk, r) + '"></i><b></b></span><span class="v num">' + covNum(x.wk) + '</span></div>';
+    });
+    return h;
+  }
+  function covSumHtml(C) {
+    if (!C.any) return 'No finished workouts in this window.';
+    var low = COV_ORDER.filter(function (r) { return COV_SMALL.indexOf(r) < 0 && covLow(C.regs[r].wk, r); })
+      .sort(function (a, b) { return C.regs[a].wk - C.regs[b].wk; }).map(function (r) { return REG_LABEL[r]; });
+    var s = low.length ? '<b>Below goal:</b> ' + esc(joinWords(low)) + '.' : '<b>Every main muscle is on target.</b>';
+    if (C.short) s += ' Only ' + C.days + (C.days === 1 ? ' day' : ' days') + ' of history so far.';
+    return s;
+  }
+  function covSelHtml(C) {
+    var m = state.recSel; if (!m || !C.regs[m]) return '<span class="muted">Tap a muscle for its sets, reps and which routine trains it.</span>';
+    var x = C.regs[m], g = covGoal(m), by = trainedBy(m), low = covLow(x.wk, m);
+    return '<b>' + REG_LABEL[m] + '</b> <span class="muted">· ' + covNum(x.wk) + ' sets a week · ' + (low ? covNum(g - x.wk) + ' short of ' + g : 'on target') + '</span>' +
+      '<div class="muted" style="font-size:13px;margin-top:4px">' + x.reps + ' reps in this window' + (x.avg ? ' · ' + covNum(x.avg) + ' per set on average' : '') + '</div>' +
+      '<div class="muted" style="font-size:13px;margin-top:2px">' + (by.length ? 'Trained by ' + esc(joinWords(by)) : 'None of your routines train it yet') + '</div>';
+  }
+  function covCardsHtml() {
+    var C = coverage(), h = '';
+    h += '<section class="card"><div class="eyebrow">Average over</div><div class="covctl">' + [1, 2, 3, 4].map(function (n) {
+      return '<button data-act="recW" data-v="' + n + '" class="' + (state.recW === n ? 'on' : '') + '">' + n + ' wk</button>';
+    }).join('') + '</div>' +
+      '<div class="tline"><div class="top"><span>Ending</span><b id="cov-el">' + esc(covLabel(C)) + '</b></div><input id="cov-e" class="trange" type="range" min="-84" max="0" step="1" value="' + (state.recE || 0) + '" aria-label="Move the window back in time"></div>' +
+      heatMapsHtml(null, function (m) { return covFill(C.regs[m].wk, m); }) +
+      '<div class="covlegend"><span>0</span><span class="g"></span><span>Goal</span></div>' +
+      '<div class="selinfo" id="rec-sel">' + covSelHtml(C) + '</div></section>';
+    h += '<section class="card"><div class="eyebrow" style="margin-bottom:2px">Sets a week</div><div class="covsum" id="cov-sum">' + covSumHtml(C) + '</div><div id="cov-bars" style="margin-top:6px">' + covRowsHtml(C) + '</div>' +
+      '<div class="fine">Dashed line: about 10 hard sets a muscle a week (5 for smaller muscles). Helper muscles count half, so a bench press set is 1 chest and 0.5 triceps. Cardio is not counted.</div></section>';
+    return h;
+  }
+  function updateCov() {
+    var C = coverage();
+    Array.prototype.forEach.call(app.querySelectorAll('#hmaps .hreg'), function (g) { var m = g.dataset.m; if (C.regs[m]) g.style.fill = covFill(C.regs[m].wk, m); });
+    var b = document.getElementById('cov-bars'); if (b) b.innerHTML = covRowsHtml(C);
+    var s = document.getElementById('cov-sum'); if (s) s.innerHTML = covSumHtml(C);
+    var q = document.getElementById('rec-sel'); if (q) q.innerHTML = covSelHtml(C);
+    setText('cov-el', covLabel(C));
+  }
   function recoverView() {
-    var ev = loadEvents(), T = Date.now() + (state.recT || 0) * HOUR, H = heatAt(ev, T);
+    var ev = loadEvents(), T = Date.now() + (state.recT || 0) * HOUR, H = heatAt(ev, T), now = state.recMode === 'now';
     var h = '<header class="top"><div><div class="eyebrow">Body and recovery</div><h1 class="display">Recover</h1></div></header><div class="stack">';
+    h += '<div class="seg"><button data-act="recMode" data-v="cov" class="' + (now ? '' : 'on') + '">Coverage</button><button data-act="recMode" data-v="now" class="' + (now ? 'on' : '') + '">Right now</button></div>';
+    if (now) {
     h += '<section class="card">' + heatMapsHtml(H) +
       '<div class="hlegend"><span>Fresh</span><span class="g"></span><span>Just worked</span></div>' +
       '<div class="selinfo" id="rec-sel">' + recSelHtml(ev, H, T) + '</div>' +
@@ -2614,6 +2713,7 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
     if (!tired.length) h += '<div class="muted" style="margin-top:6px">Everything is fresh. Good day to train anything.</div>';
     else h += tired.slice(0, 7).map(function (r) { return '<div class="recrow"><span class="nm">' + REG_LABEL[r] + '</span><span class="hbar"><i style="width:' + Math.round(H[r] * 100) + '%;background:' + heatFill(H[r]) + '"></i></span><span class="t num">~' + freshIn(ev, r, T) + ' h</span></div>'; }).join('');
     h += '</section>';
+    } else h += covCardsHtml();
     // Heat and cold
     h += '<h2 class="display sec">Heat and cold</h2><div class="tiles"><button class="tile heat" data-act="lgOpen" data-k="sauna">' + IC_SAUNA + 'Sauna</button><button class="tile hammam" data-act="lgOpen" data-k="hammam">' + IC_HAMMAM + 'Hammam</button><button class="tile cold" data-act="lgOpen" data-k="cold">' + IC_COLD + 'Cold</button></div>';
     var ws = weekStartTs(Date.now()), wm = weekMins(ws), days = [], mx = 20;
@@ -3259,6 +3359,8 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
       state.sheet = { type: 'lg', id: a.t + ':' + a.id }; render();
     },
     recMuscle: function (d) { state.recSel = state.recSel === d.m ? '' : d.m; render(); },
+    recMode: function (d) { state.recMode = d.v === 'now' ? 'now' : 'cov'; render(); },
+    recW: function (d) { state.recW = Math.min(4, Math.max(1, +d.v || 1)); render(); },
     tipOff: function (d) {
       var ids = tipsOff().concat([d.id]);
       try { localStorage.setItem('liftlog.tipsOff', JSON.stringify({ day: dayStart(Date.now()), ids: ids })); } catch (e) { /* private mode */ }
@@ -3573,6 +3675,7 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
     else if (t.id === 'rn-in') state.rnText = t.value;
     else if (t.id === 'lg-when') { if (state.lg) state.lg.when = t.value; }
     else if (t.id === 'rec-t') { state.recT = +t.value || 0; updateRecMap(); }
+    else if (t.id === 'cov-e') { state.recE = Math.min(0, Math.max(-84, +t.value || 0)); updateCov(); }
     else if (t.id === 'lib-q') { state.libQ = t.value; var lb = document.getElementById('lib-body'); if (lb) lb.innerHTML = libBody(); }
     else if (t.id === 'chat-in') coach.draft = t.value;
     else if (t.id === 'bk-in') state.bkText = t.value;
