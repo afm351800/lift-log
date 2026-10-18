@@ -1234,7 +1234,7 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
     if (!allTop) return null;
     var kg = Math.max.apply(null, last.sets.map(function (x) { return x.kg || 0; }));
     if (!(kg > 0)) return null;
-    var next = Math.round((kg + 2.5) * 100) / 100;
+    var next = isDumbbell(it.exId) ? Math.floor(kg / 2) * 2 + 2 : Math.round((kg + 2.5) * 100) / 100;
     var todo = it.sets.filter(function (x) { return x.status === 'todo'; });
     if (!todo.length || todo.every(function (x) { return (x.kg || 0) >= next; })) return null;
     return { top: top, kg: next };
@@ -3004,39 +3004,73 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
   document.addEventListener('touchend', function () { if (sw && sw.lock !== 1 && pendingRender) setTimeout(function () { if (pendingRender && !focusedInput()) render(); }, 0); });
 
   /* ---------- timer, sound, wake lock ---------- */
-  var ticker = null, beeped = false, actx = null, wake = null;
+  var ticker = null, beeped = false, actx = null, wake = null, restLast = -1;
+  var master = null;
   function ensureAudio() {
     try {
-      if (!actx) { var AC = window.AudioContext || window.webkitAudioContext; if (AC) actx = new AC(); }
-      if (actx && actx.state === 'suspended') actx.resume();
+      if (!actx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) {
+          // 'ambient' mixes with your music instead of stopping it (iPhone only).
+          try { if (navigator.audioSession) navigator.audioSession.type = 'ambient'; } catch (e) { /* older iOS */ }
+          actx = new AC();
+          // Compressor + master gain: lets the notes be loud without crackling.
+          var comp = actx.createDynamicsCompressor();
+          comp.threshold.value = -14; comp.knee.value = 8; comp.ratio.value = 6; comp.attack.value = 0.002; comp.release.value = 0.12;
+          master = actx.createGain(); master.gain.value = 1;
+          master.connect(comp); comp.connect(actx.destination);
+        }
+      }
+      if (actx && actx.state !== 'running') actx.resume();
     } catch (e) { /* no audio */ }
   }
+  // iPhone only lets a page make sound after a tap, and can pause audio when the app goes to the background.
+  // Wake it on every touch so the timer sounds are never silently blocked.
+  var unlocked = false;
+  function unlockAudio() {
+    ensureAudio();
+    if (!actx || unlocked) return;
+    try { var b = actx.createBuffer(1, 1, 22050), src = actx.createBufferSource(); src.buffer = b; src.connect(actx.destination); src.start(0); unlocked = true; } catch (e) { /* ignore */ }
+  }
+  document.addEventListener('touchend', unlockAudio, { passive: true });
+  document.addEventListener('click', unlockAudio, true);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && actx) ensureAudio(); });
   function soundOn() { var st = byId('settings', 'main'); return !st || st.sound !== false; }
-  // Soft, short notes: each entry is [seconds from start, frequency in Hz, length, volume]
+  // Clear, short notes pitched where an iPhone speaker is loud (about 900-2000 Hz).
+  // Each entry is [seconds from start, frequency in Hz, length, volume 0..1].
   var SFX = {
-    set: [[0, 659, 0.16, 0.09]],
-    exercise: [[0, 523, 0.18, 0.1], [0.13, 784, 0.3, 0.1]],
-    timer: [[0, 698, 0.2, 0.13], [0.24, 932, 0.34, 0.13]],
-    finish: [[0, 523, 0.2, 0.1], [0.14, 659, 0.2, 0.1], [0.28, 784, 0.2, 0.1], [0.42, 1047, 0.5, 0.1]],
-    pr: [[0, 784, 0.16, 0.1], [0.11, 988, 0.18, 0.1], [0.22, 1319, 0.45, 0.11]],
-    // Hold timer: a soft blip for each of the last five seconds, a double blip at ten, a small bell at the end.
-    tick: [[0, 988, 0.07, 0.07]],
-    ten: [[0, 988, 0.06, 0.07], [0.13, 988, 0.06, 0.07]],
-    switch: [[0, 784, 0.18, 0.1], [0.16, 1047, 0.32, 0.1]],
-    ring: [[0, 1047, 0.5, 0.11], [0, 2093, 0.3, 0.025], [0.3, 1319, 0.5, 0.11], [0.6, 1568, 0.9, 0.12], [0.6, 3136, 0.4, 0.02]]
+    start: [[0, 880, 0.18, 0.55], [0.14, 1319, 0.34, 0.6]],
+    go: [[0, 1175, 0.2, 0.55]],
+    set: [[0, 1175, 0.22, 0.6], [0.1, 1760, 0.26, 0.45]],
+    skip: [[0, 932, 0.2, 0.45]],
+    exercise: [[0, 1047, 0.2, 0.6], [0.14, 1319, 0.2, 0.6], [0.28, 1568, 0.4, 0.65]],
+    rtick: [[0, 1319, 0.1, 0.5]],
+    timer: [[0, 1568, 0.22, 0.75], [0.26, 1568, 0.22, 0.75], [0.52, 2093, 0.55, 0.8]],
+    finish: [[0, 1047, 0.2, 0.6], [0.15, 1319, 0.2, 0.6], [0.3, 1568, 0.2, 0.6], [0.45, 2093, 0.6, 0.7]],
+    pr: [[0, 1568, 0.16, 0.65], [0.11, 1976, 0.18, 0.65], [0.22, 2637, 0.5, 0.7]],
+    // Hold timer: a blip for each of the last five seconds, a double blip at ten, a bell at the end.
+    tick: [[0, 1319, 0.1, 0.5]],
+    ten: [[0, 1319, 0.09, 0.5], [0.15, 1319, 0.09, 0.5]],
+    switch: [[0, 1175, 0.2, 0.6], [0.18, 1568, 0.36, 0.65]],
+    ring: [[0, 1568, 0.5, 0.7], [0.3, 1976, 0.5, 0.7], [0.6, 2349, 0.9, 0.75]]
   };
   function sfx(name) {
     if (!soundOn()) return;
     ensureAudio();
-    if (!actx || !SFX[name]) return;
+    if (!actx || !master || !SFX[name]) return;
     try {
       SFX[name].forEach(function (n) {
-        var o = actx.createOscillator(), g = actx.createGain(), t0 = actx.currentTime + n[0];
-        o.type = 'sine'; o.frequency.value = n[1];
+        var t0 = actx.currentTime + 0.01 + n[0], g = actx.createGain();
         g.gain.setValueAtTime(0.0001, t0);
-        g.gain.exponentialRampToValueAtTime(n[3], t0 + 0.015);
+        g.gain.exponentialRampToValueAtTime(n[3], t0 + 0.01);
         g.gain.exponentialRampToValueAtTime(0.0001, t0 + n[2]);
-        o.connect(g); g.connect(actx.destination); o.start(t0); o.stop(t0 + n[2] + 0.05);
+        g.connect(master);
+        // A pure tone plus a softer overtone: rounder than a beep, and it carries over music.
+        [[1, 'sine', 1], [2, 'sine', 0.35], [3, 'triangle', 0.12]].forEach(function (h) {
+          var o = actx.createOscillator(), og = actx.createGain();
+          o.type = h[1]; o.frequency.value = n[1] * h[0]; og.gain.value = h[2];
+          o.connect(og); og.connect(g); o.start(t0); o.stop(t0 + n[2] + 0.05);
+        });
       });
     } catch (e) { /* ignore */ }
   }
@@ -3057,12 +3091,14 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
     var b = document.getElementById('rest-bar'); if (b) b.classList.toggle('done', rem === 0);
     var l = document.getElementById('rest-label'); if (l) l.textContent = rem === 0 ? 'Rest over. Next set.' : 'Rest';
     var k = document.getElementById('rest-skip'); if (k) k.textContent = rem === 0 ? 'OK' : 'Skip';
+    if (rem > 0 && rem <= 3 && rem !== restLast) sfx('rtick');
+    restLast = rem;
     if (rem === 0 && !beeped) { beeped = true; beep(); }
   }
   function startRest(s) {
     s.restTotal = restSecs();
     s.restEnd = Date.now() + s.restTotal * 1000;
-    beeped = false; ensureAudio();
+    beeped = false; restLast = s.restTotal; ensureAudio();
   }
   async function acquireWake() {
     try {
@@ -3098,7 +3134,7 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
     });
     put('sessions', s);
     state.noteOpen = false;
-    acquireWake();
+    acquireWake(); sfx('start');
     go('workout');
   }
   function editRoutine(id) {
@@ -3112,6 +3148,18 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
     if (ctx === 'w') { var s = activeSession(); return s && s.items[i] && s.items[i].sets[j]; }
     if (ctx === 'h') { var hs = byId('sessions', state.view.id); return hs && hs.items[i] && hs.items[i].sets[j]; }
     return state.draft && state.draft.items[i] && state.draft.items[i].sets[j];
+  }
+  // Dumbbells at the owner's gym come in even 2 kg steps (6, 8, 10, 12...).
+  function isDumbbell(exId) {
+    var ex = exOf(exId); if (!ex) return false;
+    var l = libOf(ex);
+    return (l && l.e === 'dumbbell') || /dumbbell/i.test(ex.name || '');
+  }
+  function itemOf(ctx, i) {
+    if (ctx === 'w') { var s = activeSession(); return s && s.items[i]; }
+    if (ctx === 'h') { var hs = byId('sessions', state.view.id); return hs && hs.items[i]; }
+    if (ctx === 'e') return state.draft && state.draft.items[i];
+    return null;
   }
   function stepFor(f, ctx) { if (ctx === 'x') return lgStep(f); return f === 'kg' ? 2.5 : (f === 'secs' ? 5 : (f === 'rest' ? 15 : (f === 'weight' ? 0.5 : 1))); }
   function normalise(set, f) {
@@ -3245,7 +3293,9 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
       var cur = currentValue(k);
       if (ctx === 'p' && !cur) { applyValue(k, { weight: 70, height: 170, age: 30 }[f]); render(); return; }
       var min = f === 'rest' ? 15 : ((f === 'reps' || f === 'repsMax') && ctx === 'e' ? 1 : 0);
-      var next = Math.max(min, Math.round((cur + (+d.d) * stepFor(f, ctx)) * 100) / 100);
+      var it0 = f === 'kg' ? itemOf(ctx, +p[1]) : null, next;
+      if (it0 && isDumbbell(it0.exId)) next = Math.max(0, +d.d > 0 ? Math.floor(cur / 2) * 2 + 2 : Math.ceil(cur / 2) * 2 - 2);
+      else next = Math.max(min, Math.round((cur + (+d.d) * stepFor(f, ctx)) * 100) / 100);
       applyValue(k, next); render();
     },
     cancelEdit: function () { var d = state.draft; state.draft = null; go(d && !d.isNew ? 'routine' : 'home', { id: d && d.id }); },
@@ -3313,7 +3363,7 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
     },
     toggleNote: function () { state.noteOpen = !state.noteOpen; render(); },
     exlist: function () { state.sheet = { type: 'exlist' }; render(); },
-    startEx: function () { var s = activeSession(); s.stage = 'active'; put('sessions', s); acquireWake(); ensureAudio(); render(); try { window.scrollTo(0, 0); } catch (e) { /* ignore */ } },
+    startEx: function () { var s = activeSession(); s.stage = 'active'; put('sessions', s); acquireWake(); sfx('go'); render(); try { window.scrollTo(0, 0); } catch (e) { /* ignore */ } },
     toPre: function () { var s = activeSession(); s.stage = 'pre'; put('sessions', s); render(); },
     wAddSet: function () {
       var s = activeSession(), it = s.items[s.idx]; var p = it.sets[it.sets.length - 1];
@@ -3332,7 +3382,7 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
           else sfx(it.sets.every(function (y) { return y.status !== 'todo'; }) ? 'exercise' : 'set');
           var everything = s.items.every(function (x) { return x.sets.every(function (y) { return y.status !== 'todo'; }); });
           if (!everything) startRest(s);
-        }
+        } else if (d.s === 'skipped') sfx('skip');
       }
       put('sessions', s); render();
     },
