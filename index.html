@@ -80,6 +80,7 @@ h1.display,.rname,.bestnum{color:#fff}
 .field{width:100%;min-height:50px;background:rgba(18,9,5,.6);border:1px solid var(--line);border-radius:14px;padding:0 14px;font-size:17px;box-shadow:inset 0 2px 6px rgba(0,0,0,.45)}
 .field::placeholder{color:var(--muted)}
 textarea.field{padding:12px 14px;min-height:88px;resize:vertical}
+.exnote{display:block;margin-top:10px;min-height:96px;background:rgba(10,5,2,.78);border-color:rgba(255,255,255,.05);color:var(--text,#f4ece4);font-size:16px;line-height:1.4;font-family:inherit;box-shadow:inset 0 2px 8px rgba(0,0,0,.6)}
 .dots{display:flex;gap:6px;flex-wrap:wrap}
 .mdot{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block;box-shadow:0 0 0 2px rgba(0,0,0,.3)}
 .pill{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;padding:5px 11px;border-radius:999px;border:1px solid rgba(240,222,200,.2);background:rgba(20,10,5,.45)}
@@ -1266,20 +1267,19 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
     var th = l ? '<button class="exthumb" data-act="exInfo" data-id="' + esc(l.id) + '" aria-label="How to do ' + esc(it.name) + '"><span class="exthumb-img" style="background-image:url(\'' + imgUrl(l) + '\')"></span><span class="exthumb-hint">Form</span></button>' : '';
     return '<div class="exhead hasthumb"><div class="exmain"><div><span class="pill"><span class="mdot" style="background:' + mcol(it.muscle) + '"></span>' + esc(it.muscle) + '</span></div><h1 class="display">' + esc(it.name) + '</h1>' + (extra || '') + '</div>' + th + '</div>';
   }
+  // Notes card for one exercise. Saved on the exercise itself (ex.note), so it shows in every routine/workout that uses it.
+  function notesHtml(ex, lib) {
+    return '<section class="card"><div class="eyebrow">Notes</div><textarea class="field exnote" data-ex="' + esc(ex ? ex.id : '') + '" data-lib="' + esc(lib || '') + '" placeholder="How did the weights feel?" aria-label="Exercise notes">' + esc(ex && ex.note ? ex.note : '') + '</textarea></section>';
+  }
   function preView(s) {
     var it = s.items[s.idx], ex = exOf(it.exId);
     var hist = history(it.exId);
     var h = '<header class="top"><button class="link" data-act="quitAsk">‹ Exit</button><div class="eyebrow">Exercise ' + (s.idx + 1) + ' of ' + s.items.length + '</div>' +
-      '<button class="iconbtn ' + (state.noteOpen ? 'on' : '') + '" data-act="toggleNote" aria-label="Notes" aria-pressed="' + state.noteOpen + '">' + ICON_NOTE + '</button></header>';
+      '<span></span></header>';
     h += exHeadHtml(it);
     h += '<div class="stack">';
     h += '<button class="btn btn-ghost wide" data-act="exlist">Choose another exercise ▾</button>';
     h += nudgeHtml(it);
-    if (state.noteOpen) {
-      h += '<textarea id="note-ta" class="field" placeholder="Your notes: seat height, grip, cues to remember" aria-label="Exercise notes">' + esc(ex && ex.note ? ex.note : '') + '</textarea>';
-    } else if (ex && ex.note) {
-      h += '<div class="notice" style="margin:0">' + esc(ex.note) + '</div>';
-    }
     it.sets.forEach(function (st, j) {
       h += '<div class="card"><div class="set-top" style="margin-bottom:10px"><span class="set-n">Set ' + (j + 1) + '</span><span class="set-s">' + esc(targetText(st, it)) + '</span></div><div class="set-grid">' + setFields('w', s.idx, j, st, it.mode) + '</div></div>';
     });
@@ -1293,6 +1293,7 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
       h += '<div class="muted" style="margin-top:6px">No history yet. Your first session sets the baseline.</div>';
     }
     h += '</section>';
+    h += notesHtml(ex);
     h += '</div>';
     return h + dock(s, '<button class="btn btn-primary wide" data-act="startEx">Start exercise</button>');
   }
@@ -1338,6 +1339,7 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
     });
     h += '</div></section>';
     h += '<div class="card"><div class="eyebrow" style="margin-bottom:8px">Rest between sets</div><div class="set-grid"><div>' + stepper('r:0:0:rest', restSecs(), 'seconds', 'r') + '</div></div></div>';
+    h += notesHtml(exOf(it.exId));
     h += '</div>';
     var nav = '<button class="btn btn-ghost" data-act="prevEx"' + (s.idx === 0 ? ' disabled style="opacity:.4"' : '') + '>‹ Back</button>';
     nav += ni < 0
@@ -1753,7 +1755,7 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
     var hs = history(e.id);
     var h = '<header class="top"><button class="link" data-act="go" data-to="progress">‹ Progress</button><span></span><span></span></header>';
     h += '<div class="exhead"><div><span class="pill"><span class="mdot" style="background:' + mcol(e.muscle) + '"></span>' + esc(e.muscle) + '</span></div><h1 class="display">' + esc(e.name) + '</h1></div>';
-    if (!hs.length) return h + '<div class="card empty">No completed sets yet.</div>';
+    if (!hs.length) return h + '<div class="stack"><div class="card empty">No completed sets yet.</div>' + notesHtml(e) + '</div>';
     var best = hs.reduce(function (a, c) { return (c.v > a.v || (c.v === a.v && c.reps > a.reps)) ? c : a; });
     var change = hs[hs.length - 1].v - hs[0].v, stn = stallOf(e.id);
     if (stn) h += '<div class="card tip stall" style="margin-bottom:14px"><div class="grow">' + esc(stallText(stn)) + '</div></div>';
@@ -1763,6 +1765,7 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
     h += '<h2 class="display sec">Sessions</h2><div class="card"><div class="rows">' + hs.slice().reverse().map(function (p) {
       return '<div class="row"><div class="grow"><div class="nm">' + esc(fmtDateLong(p.ts)) + '</div><div class="sub num">' + esc(p.done.map(function (x) { return p.timed ? x.secs + ' s' : kgText(x.kg) + 'x' + x.reps; }).join('  ')) + '</div></div></div>';
     }).join('') + '</div></div>';
+    h += '<div style="margin-top:14px">' + notesHtml(e) + '</div>';
     return h;
   }
 
@@ -1882,13 +1885,17 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
     if (!l) return libView();
     var inR = D('routines').filter(function (r) { return r.items.some(function (it) { var x = libOf(exOf(it.exId)); return x && x.id === l.id; }); });
     var info = state.view.name === 'exInfo';
+    var nex = null, as = info ? activeSession() : null;
+    if (as && as.items[as.idx]) { var cx = exOf(as.items[as.idx].exId), cl = libOf(cx); if (cl && cl.id === l.id) nex = cx; }
+    if (!nex) nex = D('exercises').find(function (e) { var x = libOf(e); return x && x.id === l.id; }) || null;
     var h = '<header class="top"><button class="link" data-act="' + (info ? 'exInfoBack' : 'libBack') + '">‹ Back</button><span></span><span></span></header>';
     h += '<div class="exhead"><div class="dots"><span class="pill"><span class="mdot" style="background:' + mcol(libGroup(l)) + '"></span>' + esc(mLabel(l.m)) + '</span>' +
       l.s.map(function (s) { return '<span class="pill">' + esc(mLabel(s)) + '</span>'; }).join('') + '<span class="pill">' + esc(eqLabel(l.e)) + '</span></div><h1 class="display">' + esc(l.n) + '</h1></div>';
     h += '<div class="stack"><section class="card">' + framesHtml(l) + '</section>';
     h += '<section class="card"><div class="eyebrow">How to</div><ol class="steps">' + l.i.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ol></section>';
-    if (info) return h + '</div>' + bar('<button class="btn btn-primary wide" data-act="exInfoBack">Back to workout</button>');
-    h += '<section class="card"><div class="eyebrow">In your routines</div><div style="margin-top:6px">' + (inR.length ? esc(inR.map(function (r) { return r.name; }).join(', ')) : '<span class="muted">Not in any routine yet.</span>') + '</div></section></div>';
+    if (info) return h + notesHtml(nex, l.id) + '</div>' + bar('<button class="btn btn-primary wide" data-act="exInfoBack">Back to workout</button>');
+    h += '<section class="card"><div class="eyebrow">In your routines</div><div style="margin-top:6px">' + (inR.length ? esc(inR.map(function (r) { return r.name; }).join(', ')) : '<span class="muted">Not in any routine yet.</span>') + '</div></section>';
+    h += notesHtml(nex, l.id) + '</div>';
     return h + bar('<button class="btn btn-primary wide" data-act="addTo" data-id="' + esc(l.id) + '">Add to routine</button>');
   }
 
@@ -3480,10 +3487,8 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
     var t = e.target;
     if (t.dataset && t.dataset.act === 'type') {
       applyValue(t.dataset.k, parseNum(t.value)); render();
-    } else if (t.id === 'note-ta') {
-      var s = activeSession(); if (!s) return;
-      var ex = exOf(s.items[s.idx].exId); if (!ex) return;
-      ex.note = t.value.trim(); put('exercises', ex);
+    } else if (t.classList && t.classList.contains('exnote')) {
+      saveNote(t, true);
     } else if (t.id === 'scan-file') {
       var f0 = t.files && t.files[0]; try { t.value = ''; } catch (er) { /* ignore */ }
       if (f0) importScan(f0);
@@ -3494,8 +3499,24 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
       addFiles(t.files); try { t.value = ''; } catch (er) { /* ignore */ }
     }
   });
+  // Exercise notes: kept in memory on every key, written to storage (and GitHub sync) shortly after typing stops.
+  var noteTimer = null;
+  function saveNote(t, now) {
+    var ex = exOf(t.dataset.ex);
+    if (!ex && t.dataset.lib && LIBBY[t.dataset.lib]) {
+      if (!t.value.trim()) return;
+      ex = ensureLibEx(LIBBY[t.dataset.lib]); t.dataset.ex = ex.id;
+    }
+    if (!ex) return;
+    var v = now ? t.value.trim() : t.value;
+    if (v) ex.note = v; else delete ex.note;
+    clearTimeout(noteTimer);
+    if (now) put('exercises', ex);
+    else noteTimer = setTimeout(function () { put('exercises', ex); }, 600);
+  }
   app.addEventListener('input', function (e) {
     var t = e.target;
+    if (t.classList && t.classList.contains('exnote')) { saveNote(t, false); return; }
     if (t.dataset && t.dataset.act === 'draftName') state.draft.name = t.value;
     else if (t.id === 'pick-q') { state.picker.q = t.value; var l = document.getElementById('pick-list'); if (l) l.innerHTML = pickList(); }
     else if (t.id === 'custom-name') state.picker.customName = t.value;

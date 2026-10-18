@@ -46,6 +46,7 @@ Ultra-premium dark: deep lacquered brown ombre background, smoked-glass panels, 
 - Stall detector: `stallOf` = sessions since the last new best by estimated 1RM (>= 3 -> tip on Today and on the exercise page).
 - Share card: `shareSession` draws a 1080x1920 PNG on a canvas (worked-muscle map, time/sets/kg, only real wins), shares via the iOS share sheet, falls back to an image sheet.
 - Each side: routine item `sides:true` (editor chip, time mode only), copied to the session item; the hold timer runs side 1, a 5 s "Switch sides" gap, then side 2.
+- Exercise notes (2026-10-18): `notesHtml(ex, libId)` puts a dark Notes box at the bottom of every exercise page (workout overview, active sets, form page, Library, Progress exercise). Text lives on the exercise doc (`ex.note`, existing field), so it shows in every routine/workout using that exercise. `saveNote` keeps it in memory per key and `put`s 600 ms after typing stops (and on blur). On a Library page with no matching exercise yet, the first note creates one via `ensureLibEx`. The old header note toggle was removed.
 - Settings tab dot (`syncDot`): green = on GitHub, orange = waiting/offline, red = GitHub refused (token). Only shown when sync is connected.
 
 ## Rules for changes
