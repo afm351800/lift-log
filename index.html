@@ -399,6 +399,13 @@ table.seg2 td{text-align:right;padding:8px 0;border-top:1px solid var(--line)}
 .wk .dots{display:flex;flex-wrap:wrap;justify-content:center;gap:3px;max-width:30px}
 .wk .dots i{width:7px;height:7px;border-radius:50%;display:block}
 .wsum{margin-top:10px;color:var(--muted);font-size:14px}
+.wkcard{padding-left:0;padding-right:0;overflow:hidden}
+.wkpage{padding:0 16px!important}
+.wkscroll{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-width:none}
+.wkscroll::-webkit-scrollbar{display:none}
+.wkpage{flex:0 0 100%;box-sizing:border-box;scroll-snap-align:start;scroll-snap-stop:always;padding:0 18px}
+.wkhead{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.wkhint{font-size:11px;color:var(--muted);opacity:.7;white-space:nowrap}
 
 /* Living body map */
 .hmaps{display:grid;grid-template-columns:1fr 1fr;gap:4px;align-items:start;margin-top:4px}
@@ -2592,16 +2599,25 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
       h += '<div class="card tip' + (t.go ? ' stall' : '') + '"><div class="grow"' + (t.go ? ' data-act="openEx" data-id="' + esc(t.go) + '" role="button" tabindex="0"' : '') + '>' + t.html + '</div><button class="tiny" data-act="tipOff" data-id="' + esc(t.id) + '" aria-label="Hide for today">✕</button></div>';
     });
     // This week
-    var lifts = 0, cards = 0, wk = '';
-    for (var i = 0; i < 7; i++) {
-      var d0 = dayStart(ws, i), d1 = dayStart(ws, i + 1), dots = '';
-      D('sessions').forEach(function (s) { if (s.finishedAt >= d0 && s.finishedAt < d1) { dots += '<i class="k-lift"></i>'; lifts++; } });
-      actsLog().forEach(function (a) { if (a.ts >= d0 && a.ts < d1) { dots += '<i class="' + (isCardio(a) ? 'k-cardio' : a.t === 'cold' ? 'k-cold' : 'k-heat') + '"></i>'; if (isCardio(a)) cards++; } });
-      wk += '<div class="c' + (d0 === dayStart(Date.now()) ? ' today' : '') + '"><span class="d">' + 'MTWTFSS'.charAt(i) + '</span><span class="dots">' + dots + '</span></div>';
+    // Swipeable weeks: the current week is on the right, drag right to see earlier weeks (back to the first week with data, up to 26).
+    var allSess = D('sessions'), allActs = actsLog(), first = Date.now();
+    allSess.forEach(function (s) { if (s.finishedAt && s.finishedAt < first) first = s.finishedAt; });
+    allActs.forEach(function (a) { if (a.ts && a.ts < first) first = a.ts; });
+    var nWeeks = Math.max(2, Math.min(26, Math.round((ws - weekStartTs(first)) / 604800000) + 1)), pages = '', shortDate = function (t) { return new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); };
+    for (var k = nWeeks - 1; k >= 0; k--) {
+      var wsk = dayStart(ws, -7 * k), wmk = weekMins(wsk), lifts = 0, cards = 0, wk = '';
+      for (var i = 0; i < 7; i++) {
+        var d0 = dayStart(wsk, i), d1 = dayStart(wsk, i + 1), dots = '';
+        allSess.forEach(function (s) { if (s.finishedAt >= d0 && s.finishedAt < d1) { dots += '<i class="k-lift"></i>'; lifts++; } });
+        allActs.forEach(function (a) { if (a.ts >= d0 && a.ts < d1) { dots += '<i class="' + (isCardio(a) ? 'k-cardio' : a.t === 'cold' ? 'k-cold' : 'k-heat') + '"></i>'; if (isCardio(a)) cards++; } });
+        wk += '<div class="c' + (d0 === dayStart(Date.now()) ? ' today' : '') + '"><span class="d">' + 'MTWTFSS'.charAt(i) + '</span><span class="dots">' + dots + '</span></div>';
+      }
+      var sum = [lifts + ' workout' + (lifts === 1 ? '' : 's'), cards + ' cardio'];
+      if (wmk.heat) sum.push(wmk.heat + ' min heat'); if (wmk.cold) sum.push(wmk.cold + ' min cold');
+      var range = shortDate(wsk) + ' – ' + shortDate(dayStart(wsk, 6)), title = k === 0 ? 'This week' : k === 1 ? 'Last week' : range;
+      pages += '<div class="wkpage"><div class="wkhead"><div class="eyebrow">' + title + '</div>' + (k === 0 ? '<span class="wkhint">‹ swipe for earlier weeks</span>' : k === 1 ? '<span class="wkhint">' + range + '</span>' : '') + '</div><div class="wk">' + wk + '</div><div class="wsum num">' + esc(sum.join(' · ')) + '</div></div>';
     }
-    var sum = [lifts + ' workout' + (lifts === 1 ? '' : 's'), cards + ' cardio'];
-    if (wm.heat) sum.push(wm.heat + ' min heat'); if (wm.cold) sum.push(wm.cold + ' min cold');
-    h += '<section class="card"><div class="eyebrow">This week</div><div class="wk">' + wk + '</div><div class="wsum num">' + esc(sum.join(' · ')) + '</div></section>';
+    h += '<section class="card wkcard"><div class="wkscroll" data-n="' + nWeeks + '">' + pages + '</div></section>';
     h += '</div>';
     return h + tabbar('today');
   }
@@ -2836,6 +2852,13 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
 
   /* ---------- render ---------- */
   var pendingRender = false;
+  var wkBack = 0; // how many weeks back the Today week strip is showing (0 = this week)
+  document.addEventListener('scroll', function (e) {
+    var el = e.target;
+    if (!el || !el.classList || !el.classList.contains('wkscroll') || !el.clientWidth) return;
+    var n = +el.dataset.n || 1;
+    wkBack = Math.max(0, n - 1 - Math.round(el.scrollLeft / el.clientWidth));
+  }, true);
   function render() {
     // Never redraw under a finger that is dragging the tab bar or a page: the touch would lose its target.
     if (td || (sw && sw.lock === 1 && !sw.busy)) { pendingRender = true; return; }
@@ -2863,8 +2886,12 @@ input.trange::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24p
         default: html = homeView();
       }
     }
+    if (state.view.name !== 'today') wkBack = 0;
     app.innerHTML = html + sheetHtml() + (state.toast ? '<div class="toast' + (state.toastTop ? ' top' : '') + '" role="status">' + esc(state.toast) + '</div>' : '');
     wrapPage();
+    // Week strip on Today: open on the current week (rightmost), or stay on the older week the user was looking at.
+    var wsc = app.querySelector('.wkscroll');
+    if (wsc) { var wn = +wsc.dataset.n || 1, ww = wsc.clientWidth; if (ww) wsc.scrollLeft = (wn - 1 - Math.min(wkBack, wn - 1)) * ww; }
     // The tab thumb glides from where it was to the new page.
     var th = app.querySelector('.tab-thumb');
     if (th) {
